@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { buildOrderRequest, captureIdOf, type PayPalPayments } from "../paypal/index.js";
+import { PayPalError } from "../paypal/errors.js";
 import type { WalletStore } from "../server/walletStore.js";
 import { evaluate, periodStart, type SpendRecord } from "./policy.js";
 import { MandateSigner } from "./signing.js";
@@ -79,7 +80,22 @@ export class MandateService {
     const m = this.must(mandateId);
     const wallet = this.wallets.get(m.walletRef)!;
     const rid = `mdt-${mandateId}-${randomUUID()}`;
-    let order = await this.pay.createOrder(buildOrderRequest(toItems(lines), m.currency, { vaultId: wallet.vaultId, customId: mandateId }), rid);
+    // If PayPal needs the buyer (PAYER_ACTION_REQUIRED status, or a declined saved wallet), never retry
+    // silently: hand the purchase to the person as an approval card that runs a human-present checkout.
+    const handOff = (why: string) => {
+      const cm: CartMandate = { id: id("cart"), mandateId, agentId, lines, totalCents: policy.totalCents, rationale, status: "pending", createdAt: this.now().toISOString(),
+        policy: { ...policy, decision: "needs_approval", reason: `${policy.reason} ${why}` } };
+      this.carts.set(cm.id, cm);
+      return { decision: "needs_approval" as const, cartMandate: cm, policy: cm.policy };
+    };
+    let order;
+    try {
+      order = await this.pay.createOrder(buildOrderRequest(toItems(lines), m.currency, { vaultId: wallet.vaultId, customId: mandateId }), rid);
+    } catch (e) {
+      if (e instanceof PayPalError && e.isInstrumentDeclined) return handOff("PayPal declined the saved wallet, so it needs you to pay this one.");
+      throw e;
+    }
+    if (order.status === "PAYER_ACTION_REQUIRED") return handOff("PayPal asked for you to confirm this payment.");
     if (order.status === "APPROVED") order = await this.pay.captureOrder(order.id!);
     const receipt = this.record(mandateId, agentId, lines, `mandate:${policy.rule}`, policy.reason, rationale, order.id!, captureIdOf(order), order.status === "COMPLETED" ? "captured" : "pending");
     return { decision: "allow", receipt, policy };

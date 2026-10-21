@@ -3,7 +3,8 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { Agent, fetch as undiciFetch } from "undici";
 import type { Category } from "../mandate/types.js";
 
-// Channel3 is a public endpoint: connect directly, bypassing any credential-injecting dev proxy.
+// Channel3 is a public endpoint: connect directly, bypassing any dev proxy, unless CHANNEL3_VIA_PROXY
+// is set (local dev where the proxy injects the X-API-Key header).
 const direct = new Agent();
 const directFetch = ((url: any, init: any) => undiciFetch(url, { ...init, dispatcher: direct })) as any;
 
@@ -82,7 +83,7 @@ export class Channel3 {
       this.client = (async () => {
         const c = new Client({ name: "mandate", version: "0.1.0" });
         const headers: Record<string, string> = this.opts.apiKey ? { "X-API-Key": this.opts.apiKey } : {};
-        await c.connect(new StreamableHTTPClientTransport(new URL(this.opts.url ?? "https://mcp.trychannel3.com/"), { requestInit: { headers }, fetch: directFetch }));
+        await c.connect(new StreamableHTTPClientTransport(new URL(this.opts.url ?? "https://mcp.trychannel3.com/"), { requestInit: { headers }, ...(process.env.CHANNEL3_VIA_PROXY ? {} : { fetch: directFetch }) }));
         return c;
       })();
       this.client.catch(() => { this.client = undefined; });

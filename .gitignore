@@ -6,3 +6,4 @@ dist
 dist/
 e2e/shots/
 node_modules
+.apim.mjs

@@ -17,6 +17,22 @@ function setup() {
 const body = (walletRef: string) => ({ userId: "u1", walletRef, summary: "Restock coffee and filters, under $60 a month, ask me above $25", budget: { amount: "60.00", period: "month" }, approvalAbove: "25.00", categories: ["coffee"], expiresAt: "2027-01-01T00:00:00Z" });
 
 describe("agent purchase under a mandate", () => {
+  it("hands the purchase to the person when PayPal needs the payer (PAYER_ACTION_REQUIRED or declined wallet)", async () => {
+    const { PayPalError } = await import("../src/paypal/errors.js");
+    for (const fail of [
+      async () => ({ id: "ORDER-PA", status: "PAYER_ACTION_REQUIRED" }),
+      async () => { throw new PayPalError("declined", 422, "UNPROCESSABLE_ENTITY", "dbg", ["INSTRUMENT_DECLINED"]); },
+    ]) {
+      const { app, pay, walletRef } = setup();
+      const m = (await request(app).post("/api/mandates").send(body(walletRef))).body;
+      pay.createOrder.mockImplementationOnce(fail as any);
+      const r = await request(app).post("/api/agent/purchase").send({ mandateId: m.id, agentId: "chat-agent", items: [{ sku: "COF-FILTERS-100", quantity: 1 }], rationale: "Filters running low" });
+      expect(r.status).toBe(202);
+      expect(r.body.cartMandate.status).toBe("pending");
+      expect(r.body.policy.reason).toMatch(/PayPal/);
+      expect(pay.captureOrder).not.toHaveBeenCalled();
+    }
+  });
   it("charges in-scope carts to the saved wallet and writes a receipt", async () => {
     const { app, pay, walletRef } = setup();
     const m = (await request(app).post("/api/mandates").send(body(walletRef))).body;
