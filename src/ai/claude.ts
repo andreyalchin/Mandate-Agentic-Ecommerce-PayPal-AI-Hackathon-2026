@@ -19,9 +19,8 @@ export function cleanKey(raw?: string) {
 export function keyKind(raw?: string) {
   const k = cleanKey(raw);
   if (!k) return "none";
-  if (k.startsWith("sk-ant-api")) return "api-key";
   if (k.startsWith("sk-ant-oat")) return "oauth-token (not an API key)";
-  return "unrecognized";
+  return "set";
 }
 
 export function createClaude(env: NodeJS.ProcessEnv = process.env): Anthropic {
