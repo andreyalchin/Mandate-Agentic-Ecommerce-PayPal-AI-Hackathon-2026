@@ -17,6 +17,8 @@ The app runs in PayPal **sandbox**. Use this sandbox buyer account (sandbox mone
 
 Each browser gets its own private session, so your wallet, mandates and receipts are visible only to you.
 
+> If PayPal says "Something went wrong… PayPal isn't available at this time", your browser is probably signed in to another PayPal sandbox or developer account. Open the demo in a private or incognito window and log in with the account above.
+
 1. **Link PayPal.** Open the demo and click the PayPal button. Log in with the account above and agree to save PayPal. This creates a vaulted PayPal wallet; the vault id never reaches the browser.
 2. **Describe the rules.** Pick a suggestion or type your own, then click **Draft my mandate**. Claude turns your sentence into structured terms and lists anything it had to assume.
 3. **Review and sign.** Check the budget, the "ask me above" amount, the categories, the shops and the expiry, then click **Sign mandate**. The mandate is signed with Ed25519; the public key is at `/.well-known/mandate-keys`.
