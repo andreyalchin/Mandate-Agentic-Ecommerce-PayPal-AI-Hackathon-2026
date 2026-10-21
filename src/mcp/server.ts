@@ -4,7 +4,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { z } from "zod";
 import type { MandateService } from "../mandate/service.js";
 import { fmt } from "../mandate/money.js";
-import { cartLines, searchProducts } from "../server/catalog.js";
+import { cartLines, findProducts } from "../server/catalog.js";
 import type { AgentKeyStore } from "./agentKeys.js";
 
 const Items = z.array(z.object({ sku: z.string().min(1), quantity: z.number().int().min(1).max(20) })).min(1).max(10);
@@ -30,9 +30,9 @@ export function buildMcpServer(svc: MandateService, mandateId: string, agentId: 
 
   server.registerTool("search_products", {
     title: "Search products",
-    description: "Search the catalog. Returns sku, name, price, category and merchant.",
+    description: "Search products: demo shops plus real products with live prices from Channel3. Returns sku, name, price, category, merchant and source. One product type per query.",
     inputSchema: { query: z.string().min(1).max(200) }, annotations: { readOnlyHint: true },
-  }, async ({ query }) => json(searchProducts(query)));
+  }, async ({ query }) => json(await findProducts(query)));
 
   server.registerTool("check_cart", {
     title: "Check cart against mandate",

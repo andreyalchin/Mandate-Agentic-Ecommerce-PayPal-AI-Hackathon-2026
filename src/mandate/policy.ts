@@ -32,7 +32,7 @@ export function evaluate(m: IntentMandate, lines: CartLine[], spend: SpendRecord
   if (!add("not_expired", now < new Date(m.expiresAt), `expires ${m.expiresAt}`)) return deny("expired", "This mandate has expired.");
   if (!add("agent_allowed", !m.agents || m.agents.includes(agentId), `agent ${agentId}`)) return deny("agent_not_allowed", `Agent "${agentId}" isn't allowed to use this mandate.`);
   if (!add("non_empty", lines.length > 0 && total > 0, `${lines.length} lines`)) return deny("empty_cart", "The cart is empty.");
-  const badCat = lines.find((l) => !m.categories.includes(l.category));
+  const badCat = lines.find((l) => !(m.categories as string[]).includes(l.category));
   if (!add("category", !badCat, badCat ? `${badCat.name} is ${badCat.category}` : "all categories allowed")) return deny("category", `"${badCat!.name}" is ${badCat!.category}, which this mandate doesn't cover (${m.categories.join(", ")}).`);
   const badMerchant = m.merchants && lines.find((l) => !m.merchants!.includes(l.merchant));
   if (!add("merchant", !badMerchant, badMerchant ? badMerchant.merchant : "merchant allowed")) return deny("merchant", `${badMerchant!.merchant} isn't one of your allowed shops.`);

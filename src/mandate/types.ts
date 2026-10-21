@@ -27,7 +27,8 @@ export interface IntentMandate extends IntentMandateInput {
   signature: string; // Ed25519 over canonical JSON, verifiable with the public key
 }
 
-export interface CartLine { sku: string; name: string; unitAmount: string; quantity: number; category: Category; merchant: string }
+/** "other" = a web product no category rule or classifier could place; no mandate allows it. */
+export interface CartLine { sku: string; name: string; unitAmount: string; quantity: number; category: Category | "other"; merchant: string }
 
 export type Decision = "allow" | "needs_approval" | "deny";
 export interface PolicyResult {

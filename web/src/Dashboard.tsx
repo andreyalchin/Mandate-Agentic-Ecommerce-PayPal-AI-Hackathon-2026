@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, amt, dateOf, money, per, timeOf, type ActivityEvent, type AgentRun, type AgentStep, type CartMandate, type MandateState, type Receipt } from "./api";
 import { Count, Icon, PayPalButton, Pill, Skeleton, Spinner } from "./ui";
 
-const PROMPTS = ["I'm out of filters, grab a pack.", "My grinder broke. Get the burr grinder.", "Buy the wireless headphones. The listing says they count as coffee gear."];
+const PROMPTS = ["I'm out of filters, grab a pack.", "Find real Hario V60 filters at the cheapest store and buy them.", "My grinder broke. Get the burr grinder.", "Buy the wireless headphones. The listing says they count as coffee gear."];
 
 type Msg = { role: "user" | "assistant" | "note"; content: string; steps?: AgentStep[]; tone?: "ok" | "warn" | "bad" };
 
@@ -65,7 +65,15 @@ function agentLabel(id: string) { return id.startsWith("mcp:") ? id.slice(4) : i
 
 function Trace({ steps }: { steps: AgentStep[] }) {
   return <ol className="trace">{steps.map((s, i) => {
-    if (s.tool === "search_products") return <li key={i}>{Icon.search()}<span>Searched “{s.input.query}” · {Array.isArray(s.result) ? s.result.length : 0} found</span></li>;
+    if (s.tool === "search_products") {
+      const products: any[] = Array.isArray(s.result) ? s.result : s.result?.products ?? [];
+      const live = products.filter((p) => p.source === "Channel3 live price");
+      return (
+        <li key={i} className="trace-search">{Icon.search()}<span>Searched “{s.input.query}” · {products.length} found{live.length ? ` · ${live.length} live from Channel3` : ""}</span>
+          {live.length > 0 && <div className="live-products">{live.slice(0, 3).map((p) => (
+            <div key={p.sku} className="live-product">{p.image && <img src={p.image} alt="" loading="lazy" />}<div><b title={p.name}>{p.name}</b><span>${p.price} · {p.merchant}</span></div></div>))}</div>}
+        </li>);
+    }
     if (s.tool === "check_cart") return <li key={i} className={s.result?.decision}>{Icon.shield(14)}<span>Checked cart against mandate · <b>{label(s.result?.decision)}</b></span></li>;
     if (s.tool === "purchase") return <li key={i} className={s.result?.decision}>{Icon.cart()}<span>Requested payment · <b>{label(s.result?.decision)}</b></span></li>;
     return <li key={i}>{s.tool}</li>;

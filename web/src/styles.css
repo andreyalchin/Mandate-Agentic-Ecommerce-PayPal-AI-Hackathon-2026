@@ -149,3 +149,9 @@ select { border: 1px solid var(--line-strong); border-radius: 8px; padding: 5px 
 .issued { display: grid; gap: 6px; background: var(--surface-2); border-radius: var(--r-sm); padding: 10px 12px; } .issued .fine { margin: 0; }
 .copyrow { display: flex; justify-content: space-between; gap: 8px; align-items: center; } .copyrow code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
 .via { margin: -2px 0 0; }
+
+.trace-search { flex-wrap: wrap; }
+.live-products { flex-basis: 100%; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; margin: 4px 0 2px 22px; }
+.live-product { display: flex; gap: 8px; align-items: center; padding: 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); min-width: 0; }
+.live-product img { width: 34px; height: 34px; object-fit: contain; border-radius: 6px; background: #fff; flex-shrink: 0; }
+.live-product div { display: grid; min-width: 0; font-size: 12px; } .live-product b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .live-product span { color: var(--muted); }
