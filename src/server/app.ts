@@ -51,7 +51,10 @@ export function createApp({ cfg, pay, rest, wallets = new WalletStore(), mandate
   app.use(express.json({ limit: "100kb" }));
   // Product UI (Vite build) first, then the developer harness at /harness.html.
   app.use(compression());
-  app.use(express.static(path.resolve("dist/web"), { maxAge: "1h" }));
+  // Hashed assets are immutable; index.html must always revalidate so a deploy reaches browsers at once.
+  app.use(express.static(path.resolve("dist/web"), {
+    setHeaders: (res, file) => res.setHeader("Cache-Control", /[\\/]assets[\\/]/.test(file) ? "public, max-age=31536000, immutable" : "no-cache"),
+  }));
   if (harness) app.use(express.static(path.resolve("public")));
   else app.use(["/api/orders", "/api/refunds"], (_q, s) => { s.status(404).json({ error: "NOT_FOUND" }); });
   app.use(ownership(ownerOf ?? cookieOwner(cfg.publicOrigin.startsWith("https://")), svc, wallets, agentKeys));
