@@ -46,7 +46,7 @@ export function Setup({ wallet, onWallet, onSigned }: { wallet: Wallet | null; o
       {step === 0 && (
         <section className="card step-card" aria-labelledby="s1">
           <h2 id="s1">Link PayPal once</h2>
-          <p>PayPal saves your account so your agent can pay within your mandate while you're away. Nothing is charged now, and you can unlink anytime.</p>
+          <p>PayPal saves your account so your agent can pay within your mandate while you're away. PayPal will show a $1.00 authorization; it's voided right away, so nothing is charged. You can unlink anytime.</p>
           <PayPalButton kind="vault" onDone={(w: any) => onWallet({ walletRef: w.walletRef, label: w.label, createdAt: new Date().toISOString() })} onError={setErr} />
           <p className="fine">Sandbox: sign in with the test buyer account from the README. No real money moves.</p>
         </section>

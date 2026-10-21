@@ -42,7 +42,7 @@ export function Count({ cents }: { cents: number }) {
 type PPMode = { kind: "vault"; onDone: (w: { walletRef: string }) => void } | { kind: "approve"; cartId: string; onDone: (r: any) => void };
 
 /**
- * PayPal v6 button. "vault" saves PayPal without a purchase (buyer consent for agent charges);
+ * PayPal v6 button. "vault" saves PayPal for agent charges via a voided $1.00 authorization;
  * "approve" pays for one out-of-scope cart the agent proposed (AP2 Cart Mandate).
  */
 export function PayPalButton(props: PPMode & { onError?: (m: string) => void }) {
@@ -53,25 +53,30 @@ export function PayPalButton(props: PPMode & { onError?: (m: string) => void }) 
     let cancelled = false; let el: HTMLElement | null = null; let handler: (() => void) | null = null;
     (async () => {
       try {
-        const { sdk, ok } = await eligible(props.kind === "vault" ? "VAULT_WITHOUT_PAYMENT" : undefined);
+        const { sdk, ok } = await eligible(undefined);
         if (cancelled) return;
         if (!ok) { setState("unavailable"); return; }
         const fail = (m: string) => { setState("ready"); cb.current.onError?.(m); };
-        const session = props.kind === "vault"
-          ? sdk.createPayPalSavePaymentSession({
-              onApprove: async ({ vaultSetupToken }: any) => { try { const w = await api("/api/vault/payment-token", { setupTokenId: vaultSetupToken }); (cb.current as any).onDone(w); } catch (e: any) { fail(e.message); } },
-              onCancel: () => setState("ready"), onError: (e: any) => fail(String(e?.message ?? e)),
-            })
-          : sdk.createPayPalOneTimePaymentSession({
-              onApprove: async () => { try { const r = await api(`/api/cart-mandates/${(cb.current as any).cartId}/capture`, {}); (cb.current as any).onDone(r); } catch (e: any) { fail(e.message); } },
-              onCancel: () => setState("ready"), onError: (e: any) => fail(String(e?.message ?? e)),
-            });
+        // Both modes use a one-time checkout session. "vault" links PayPal through a $1.00 authorization that
+        // saves the wallet and is voided at once (PayPal's save-without-purchase page fails in sandbox for current Chrome).
+        let linkOrderId = "";
+        const session = sdk.createPayPalOneTimePaymentSession({
+          onApprove: async () => {
+            try {
+              const r = props.kind === "vault"
+                ? await api(`/api/vault/link-order/${linkOrderId}/complete`, {})
+                : await api(`/api/cart-mandates/${(cb.current as any).cartId}/capture`, {});
+              (cb.current as any).onDone(r);
+            } catch (e: any) { fail(e.message); }
+          },
+          onCancel: () => setState("ready"), onError: (e: any) => fail(String(e?.message ?? e)),
+        });
         el = ref.current; if (!el) return;
         handler = () => {
           setState("busy");
           // Don't await before start(): it keeps the click's user activation for the popup.
           const p = props.kind === "vault"
-            ? api("/api/vault/setup-token", { description: "Let your Mandate agent pay within the rules you sign" }).then((t: any) => ({ vaultSetupToken: t.id }))
+            ? api("/api/vault/link-order", {}).then((o: any) => { linkOrderId = o.id; return { orderId: o.id }; })
             : api(`/api/cart-mandates/${props.cartId}/order`, {}).then((o: any) => ({ orderId: o.id }));
           session.start({ presentationMode: "auto" }, p).catch((e: any) => fail(e.message));
         };

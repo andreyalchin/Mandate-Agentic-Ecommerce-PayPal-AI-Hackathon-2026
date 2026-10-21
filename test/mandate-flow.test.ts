@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import request from "supertest";
 import { createApp } from "../src/server/app.js";
 import { PayPalRest } from "../src/paypal/index.js";
@@ -140,5 +140,25 @@ describe("per-visitor sessions", () => {
     const app = createApp({ cfg, pay: fakePay(), rest: new PayPalRest(cfg, (async () => new Response("{}")) as any), harness: false });
     expect((await request(app).post("/api/refunds").send({ captureId: "CAP" })).status).toBe(404);
     expect((await request(app).post("/api/orders").send({ items: [] })).status).toBe(404);
+  });
+});
+
+describe("link PayPal via voided authorization", () => {
+  it("saves the vaulted wallet for the session and voids the $1.00 authorization", async () => {
+    const pay = fakePay({
+      createLinkOrder: vi.fn(async () => ({ id: "LINK-1", status: "PAYER_ACTION_REQUIRED" })),
+      completeLinkOrder: vi.fn(async () => ({ vaultId: "VAULT-L", customerId: "CUST-L", voided: true })),
+    });
+    const wallets = new WalletStore();
+    const app = createApp({ cfg, pay, rest: new PayPalRest(cfg, (async () => new Response("{}")) as any), wallets, harness: false });
+    const alice = request.agent(app); const bob = request.agent(app);
+    const o = await alice.post("/api/vault/link-order").send({});
+    expect(o.status).toBe(201); expect(o.body.id).toBe("LINK-1");
+    expect((await bob.post("/api/vault/link-order/LINK-1/complete").send({})).status).toBe(404); // not Bob's order
+    const done = await alice.post("/api/vault/link-order/LINK-1/complete").send({});
+    expect(done.status).toBe(201); expect(done.body.voided).toBe(true); expect(JSON.stringify(done.body)).not.toContain("VAULT-L");
+    expect((await alice.get("/api/wallets")).body).toHaveLength(1);
+    expect((await bob.get("/api/wallets")).body).toHaveLength(0);
+    expect((await alice.post("/api/vault/link-order/LINK-1/complete").send({})).status).toBe(404); // single use
   });
 });

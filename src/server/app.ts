@@ -108,6 +108,26 @@ export function createApp({ cfg, pay, rest, wallets = new WalletStore(), mandate
     } catch (e) { next(e); }
   });
 
+  // Link PayPal with a voided $1.00 authorization that saves the wallet (see PayPalPayments.createLinkOrder).
+  const linkOrders = new Map<string, string>(); // orderId -> owner
+  app.post("/api/vault/link-order", async (req, res, next) => {
+    try {
+      const o = await pay.createLinkOrder({ returnUrl: `${cfg.publicOrigin}/?vault=return`, cancelUrl: `${cfg.publicOrigin}/?vault=cancel`, brandName: "Mandate" });
+      if (!o.id) throw new Error("PayPal returned no order id");
+      linkOrders.set(o.id, req.owner!);
+      res.status(201).json({ id: o.id });
+    } catch (e) { next(e); }
+  });
+  app.post("/api/vault/link-order/:id/complete", async (req, res, next) => {
+    try {
+      if (linkOrders.get(req.params.id) !== req.owner) return res.status(404).json({ error: "NOT_FOUND" });
+      const r = await pay.completeLinkOrder(req.params.id);
+      linkOrders.delete(req.params.id);
+      const w = wallets.save(r.vaultId, r.customerId, "PayPal", req.owner);
+      res.status(201).json({ walletRef: w.walletRef, label: w.label, voided: r.voided }); // vault id stays server-side
+    } catch (e) { next(e); }
+  });
+
   app.post("/api/vault/payment-token", async (req, res, next) => {
     try {
       const { setupTokenId } = z.object({ setupTokenId: z.string().min(1) }).parse(req.body);

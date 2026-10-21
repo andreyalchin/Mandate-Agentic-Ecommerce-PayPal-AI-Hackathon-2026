@@ -72,6 +72,36 @@ export class PayPalPayments {
     try { return (await this.orders.getOrder({ id })).result; } catch (e) { throw normalizeError(e); }
   }
 
+  /**
+   * Link PayPal via a $1.00 AUTHORIZE order that stores the wallet in the vault (store_in_vault ON_SUCCESS).
+   * The authorization is voided right after, so nothing is charged. Used instead of the setup-token flow,
+   * which PayPal's newer sandbox checkout page fails with a generic error for current Chrome browsers.
+   */
+  async createLinkOrder(opts: { returnUrl: string; cancelUrl: string; brandName?: string; requestId?: string }): Promise<Order> {
+    const body = {
+      intent: CheckoutPaymentIntent.Authorize,
+      purchaseUnits: [{ amount: { currencyCode: "USD", value: "1.00" }, description: "Link PayPal to Mandate. This $1.00 authorization is voided; nothing is charged." }],
+      paymentSource: { paypal: {
+        attributes: { vault: { storeInVault: "ON_SUCCESS", usageType: "MERCHANT", customerType: "CONSUMER" } },
+        experienceContext: { brandName: opts.brandName, shippingPreference: "NO_SHIPPING", userAction: "CONTINUE", returnUrl: opts.returnUrl, cancelUrl: opts.cancelUrl },
+      } },
+    } as unknown as OrderRequest;
+    return this.createOrder(body, opts.requestId ?? randomUUID());
+  }
+
+  /** Authorize the approved link order, read the vaulted payment token, then void the $1.00 authorization. */
+  async completeLinkOrder(orderId: string): Promise<{ vaultId: string; customerId?: string; voided: boolean }> {
+    try {
+      const { result } = await this.orders.authorizeOrder({ id: orderId, paypalRequestId: `link-auth-${orderId}`, prefer: "return=representation" });
+      const vault: any = (result as any).paymentSource?.paypal?.attributes?.vault;
+      const authId = result.purchaseUnits?.[0]?.payments?.authorizations?.[0]?.id;
+      let voided = false;
+      if (authId) { try { await this.payments.voidPayment({ authorizationId: authId, paypalRequestId: `link-void-${authId}` }); voided = true; } catch { /* expires on its own; never captured */ } }
+      if (!vault?.id || vault.status !== "VAULTED") throw Object.assign(new Error("PayPal did not save the wallet. Try linking again."), { status: 409, code: "NOT_VAULTED" });
+      return { vaultId: vault.id, customerId: vault.customer?.id, voided };
+    } catch (e: any) { if (e?.code === "NOT_VAULTED") throw e; throw normalizeError(e); }
+  }
+
   /** Step 1 of "save PayPal without purchase": returns a setup token the buyer approves in the v6 SDK. */
   async createPayPalSetupToken(opts: { description: string; returnUrl: string; cancelUrl: string; brandName?: string; customerId?: string; requestId?: string }) {
     try {
