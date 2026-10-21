@@ -73,7 +73,7 @@ function DecisionFlow(props: any) {
       <div className="mw-groups">
         {GROUPS.map((g) => { const n = g.outcomes.reduce((a, o) => a + (by.get(o) ?? 0), 0); return (
           <div key={g.key} className={`mw-group ${g.tone}`} style={{ flexGrow: Math.max(n, total * 0.12) }}>
-            <div className="mw-ghead"><span>{g.label}</span><b>{n.toLocaleString()}</b><em>{Math.round((n / total) * 100)}%</em></div>
+            <div className="mw-ghead"><span>{g.label}</span><b title={`${Math.round((n / total) * 100)}% of attempts`}>{n.toLocaleString()}</b></div>
             <ul>{g.outcomes.filter((o) => (by.get(o) ?? 0) > 0).map((o) => <li key={o}><span>{o}</span><b>{(by.get(o) ?? 0).toLocaleString()}</b></li>)}</ul>
           </div>); })}
       </div>

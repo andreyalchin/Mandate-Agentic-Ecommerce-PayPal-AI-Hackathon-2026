@@ -17,8 +17,8 @@ const legend = { style: { theme: { common: { legend: { enabled: true } } } } };
 const overview: AgPageState = {
   id: "overview",
   widgets: {
-    source: { type: "button-filter", dataMapping: { value: [{ id: "attempts.source" }] }, format: { ...title("Source"), style: { selection: { type: "single" }, dimensions: { height: 28, minWidth: 64 } } } } as any,
-    period: { type: "date-filter", dataMapping: { value: [{ id: "attempts.day" }] }, format: { style: { filterType: "relative" } } } as any,
+    source: { type: "button-filter", dataMapping: { value: [{ id: "attempts.source" }] }, format: { title: { enabled: false }, style: { selection: { type: "single" }, dimensions: { height: 30, minWidth: 84 } } } } as any,
+    period: { type: "date-filter", dataMapping: { value: [{ id: "attempts.day" }] }, format: { style: { filterType: "between" } } } as any,
     "kpi-spent": kpi("Spent by agents", sum("attempts.spent"), "calendar::week"),
     "kpi-attempts": kpi("Attempts", sum("attempts.attempts"), "calendar::week"),
     "kpi-blocked": kpi("Blocked value", sum("attempts.blockedAmount"), "calendar::week"),
