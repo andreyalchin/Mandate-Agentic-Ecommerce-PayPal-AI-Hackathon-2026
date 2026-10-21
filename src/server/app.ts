@@ -11,6 +11,7 @@ import { WalletStore } from "./walletStore.js";
 import { MandateService } from "../mandate/service.js";
 import { mandateRoutes, type Llm } from "./mandateRoutes.js";
 import { mcpRoutes } from "../mcp/server.js";
+import { keyKind } from "../ai/claude.js";
 import { consoleRoutes } from "../console/studioLlm.js";
 import { AgentKeyStore } from "../mcp/agentKeys.js";
 
@@ -53,7 +54,7 @@ export function createApp({ cfg, pay, rest, wallets = new WalletStore(), mandate
   app.get("/api/health", (_req, res) => res.json({ ok: true, env: cfg.env }));
 
   app.get("/api/wallets", (_req, res) => res.json(wallets.list()));
-  app.get("/api/config", (_req, res) => res.json({ env: cfg.env, sdkUrl: webSdkUrl(cfg.env), clientId: cfg.clientId.startsWith("proxy") ? undefined : cfg.clientId, agStudioLicense: process.env.AG_STUDIO_LICENSE || undefined }));
+  app.get("/api/config", (_req, res) => res.json({ env: cfg.env, sdkUrl: webSdkUrl(cfg.env), clientId: cfg.clientId.startsWith("proxy") ? undefined : cfg.clientId, agStudioLicense: process.env.AG_STUDIO_LICENSE || undefined, ai: keyKind(process.env.ANTHROPIC_API_KEY), webhook: !!cfg.webhookId }));
 
   app.post("/api/client-token", async (_req, res, next) => {
     try {

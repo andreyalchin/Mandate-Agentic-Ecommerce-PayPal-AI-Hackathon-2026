@@ -10,11 +10,25 @@ export interface LlmClient {
  * Anthropic client. Key from ANTHROPIC_API_KEY, or none when running behind an
  * authenticating HTTPS proxy (Node's built-in fetch ignores HTTPS_PROXY, so route via undici).
  */
+/** Dashboard pastes often carry quotes, a "Bearer " prefix or a trailing newline. */
+export function cleanKey(raw?: string) {
+  const k = raw?.trim().replace(/^["']|["']$/g, "").replace(/^Bearer\s+/i, "").trim();
+  return k || undefined;
+}
+/** Non-secret description of the configured key, for /api/config diagnostics. */
+export function keyKind(raw?: string) {
+  const k = cleanKey(raw);
+  if (!k) return "none";
+  if (k.startsWith("sk-ant-api")) return "api-key";
+  if (k.startsWith("sk-ant-oat")) return "oauth-token (not an API key)";
+  return "unrecognized";
+}
+
 export function createClaude(env: NodeJS.ProcessEnv = process.env): Anthropic {
   const proxy = env.HTTPS_PROXY ?? env.https_proxy;
   const dispatcher = proxy ? new ProxyAgent(proxy) : undefined;
   return new Anthropic({
-    apiKey: env.ANTHROPIC_API_KEY ?? "proxy-injected",
+    apiKey: cleanKey(env.ANTHROPIC_API_KEY) ?? "proxy-injected",
     fetch: dispatcher ? ((url: any, init: any) => undiciFetch(url, { ...init, dispatcher })) as any : undefined,
     maxRetries: 3,
     timeout: 60_000,
