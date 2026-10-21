@@ -1,3 +1,6 @@
+import { EnvHttpProxyAgent, setGlobalDispatcher } from "undici";
+// Node's built-in fetch ignores HTTPS_PROXY; route it through the proxy when one is set.
+if (process.env.HTTPS_PROXY) setGlobalDispatcher(new EnvHttpProxyAgent());
 import { createApp } from "./app.js";
 import { createClaude, resolveModel } from "../ai/claude.js";
 import { createSdkClient, loadConfig, PayPalPayments, PayPalRest } from "../paypal/index.js";

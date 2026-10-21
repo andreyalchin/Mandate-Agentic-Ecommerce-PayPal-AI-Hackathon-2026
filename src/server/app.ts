@@ -41,12 +41,13 @@ export function createApp({ cfg, pay, rest, wallets = new WalletStore(), mandate
 
   app.get("/api/health", (_req, res) => res.json({ ok: true, env: cfg.env }));
 
-  app.get("/api/config", (_req, res) => res.json({ env: cfg.env, sdkUrl: webSdkUrl(cfg.env), clientId: cfg.clientId }));
+  app.get("/api/config", (_req, res) => res.json({ env: cfg.env, sdkUrl: webSdkUrl(cfg.env), clientId: cfg.clientId.startsWith("proxy") ? undefined : cfg.clientId }));
 
   app.post("/api/client-token", async (_req, res, next) => {
     try {
-      const origin = new URL(cfg.publicOrigin).hostname;
-      const { token, expiresIn } = await rest.clientToken([origin]);
+      // domains[] is only required by Fastlane and PayPal rejects "localhost"; send it for real hosts only.
+      const host = new URL(cfg.publicOrigin).hostname;
+      const { token, expiresIn } = await rest.clientToken(/^(localhost|127\.)/.test(host) ? [] : [host]);
       res.json({ clientToken: token, expiresIn });
     } catch (e) { next(e); }
   });

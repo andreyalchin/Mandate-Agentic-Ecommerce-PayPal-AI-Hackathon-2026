@@ -20,7 +20,7 @@
   <p>Exercises every server route with the PayPal v6 Web SDK. Sandbox only; demo catalog.</p>
 
   <section>
-    <h2>1. One-time payment (clientId)</h2>
+    <h2>1. One-time payment</h2>
     <p>Cart: 1 × coffee beans, 1 × filters. Amounts are priced on the server.</p>
     <paypal-button id="pay-once" type="pay" hidden></paypal-button>
   </section>
@@ -56,8 +56,9 @@ async function boot() {
   const cfg = await (await fetch("/api/config")).json();
   await new Promise((res, rej) => { const s = document.createElement("script"); s.src = cfg.sdkUrl; s.async = true; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
 
-  // One-time payment: clientId mode (no server token needed).
-  const sdk = await window.paypal.createInstance({ clientId: cfg.clientId, components: ["paypal-payments"], pageType: "checkout" });
+  // One-time payment: clientId mode when the server exposes one, else a browser-safe client token.
+  const auth = cfg.clientId ? { clientId: cfg.clientId } : { clientToken: (await api("/api/client-token")).clientToken };
+  const sdk = await window.paypal.createInstance({ ...auth, components: ["paypal-payments"], pageType: "checkout" });
   const methods = await sdk.findEligibleMethods({ currencyCode: "USD" });
   if (methods.isEligible("paypal")) {
     const session = sdk.createPayPalOneTimePaymentSession({

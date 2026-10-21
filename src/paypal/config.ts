@@ -39,6 +39,8 @@ export function createSdkClient(cfg: PayPalConfig): Client {
     clientCredentialsAuthCredentials: { oAuthClientId: cfg.clientId, oAuthClientSecret: cfg.clientSecret },
     environment: cfg.env === "production" ? Environment.Production : Environment.Sandbox,
     timeout: 15000,
+    // Honor HTTPS_PROXY (e.g. a credential-injecting proxy in development).
+    httpClientOptions: process.env.HTTPS_PROXY ? { proxySettings: { address: process.env.HTTPS_PROXY } } : undefined,
     logging: { logLevel: LogLevel.Warn, logRequest: { logBody: false }, logResponse: { logHeaders: true } },
   });
 }
