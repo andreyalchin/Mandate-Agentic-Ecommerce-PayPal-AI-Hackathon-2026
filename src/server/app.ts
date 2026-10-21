@@ -7,12 +7,15 @@ import {
 } from "../paypal/index.js";
 import { priceCart } from "./catalog.js";
 import { WalletStore } from "./walletStore.js";
+import { MandateService } from "../mandate/service.js";
+import { mandateRoutes } from "./mandateRoutes.js";
 
-export interface Deps { cfg: PayPalConfig; pay: PayPalPayments; rest: PayPalRest; wallets?: WalletStore; onEvent?: (e: any) => void | Promise<void> }
+export interface Deps { cfg: PayPalConfig; pay: PayPalPayments; rest: PayPalRest; wallets?: WalletStore; mandates?: MandateService; onEvent?: (e: any) => void | Promise<void> }
 
 const Cart = z.object({ items: z.array(z.object({ sku: z.string().min(1), quantity: z.number().int().min(1).max(20) })).min(1) });
 
-export function createApp({ cfg, pay, rest, wallets = new WalletStore(), onEvent }: Deps) {
+export function createApp({ cfg, pay, rest, wallets = new WalletStore(), mandates, onEvent }: Deps) {
+  const svc = mandates ?? new MandateService(pay, wallets);
   const app = express();
   const inbox = new WebhookInbox();
   // Sandbox-only negative testing: forward ?mock=<PayPal-Mock-Response JSON> to PayPal.
@@ -33,6 +36,8 @@ export function createApp({ cfg, pay, rest, wallets = new WalletStore(), onEvent
 
   app.use(express.json({ limit: "100kb" }));
   app.use(express.static(path.resolve("public")));
+
+  app.use(mandateRoutes(svc, cfg.publicOrigin));
 
   app.get("/api/health", (_req, res) => res.json({ ok: true, env: cfg.env }));
 
@@ -114,7 +119,8 @@ export function createApp({ cfg, pay, rest, wallets = new WalletStore(), onEvent
   // Error mapping: always surface debug_id; tell the client when to restart with another funding source.
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     if (err instanceof z.ZodError) return res.status(400).json({ error: "INVALID_REQUEST", issues: err.issues });
-    if ((err as any)?.status === 400 && !(err instanceof PayPalError)) return res.status(400).json({ error: "INVALID_REQUEST", message: (err as Error).message });
+    const st = (err as any)?.status;
+    if (!(err instanceof PayPalError) && typeof st === "number" && st >= 400 && st < 500) return res.status(st).json({ error: st === 404 ? "NOT_FOUND" : st === 409 ? "CONFLICT" : "INVALID_REQUEST", message: (err as Error).message });
     const e = normalizeError(err);
     const status = e.isInstrumentDeclined ? 422 : e.status >= 400 && e.status < 600 ? e.status : 502;
     console.error(`[paypal] ${e.status} ${e.name_} debug_id=${e.debugId} ${e.message}`);
