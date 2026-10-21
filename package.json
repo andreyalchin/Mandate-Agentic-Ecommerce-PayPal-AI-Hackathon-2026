@@ -8,7 +8,8 @@
     "start": "tsx src/server/index.ts",
     "typecheck": "tsc --noEmit -p .",
     "test": "vitest run",
-    "smoke": "tsx scripts/smoke-sandbox.ts"
+    "smoke": "tsx scripts/smoke-sandbox.ts",
+    "smoke:claude": "tsx scripts/smoke-claude.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.0.0",

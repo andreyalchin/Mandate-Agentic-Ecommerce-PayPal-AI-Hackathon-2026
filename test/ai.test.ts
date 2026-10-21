@@ -32,7 +32,14 @@ describe("mandate drafter", () => {
     expect(r.body.mandate).toMatchObject({ budget: { amount: "60.00", period: "month" }, categories: ["coffee"] });
     expect(r.body.clarifications).toEqual(["Include filters?"]);
     expect(svc.mandates.size).toBe(before);
-    expect((llm.create.mock.calls[0] as any)[0].tool_choice).toEqual({ type: "tool", name: "propose_mandate" });
+    expect((llm.create.mock.calls[0] as any)[0].tool_choice).toEqual({ type: "auto" });
+  });
+  it("retries once when the model answers in prose", async () => {
+    const llm = fakeLlm([text("Sure, here's a plan."), toolUse("propose_mandate", { summary: "Coffee", budget_amount: "20.00", budget_period: "week", approval_above: "10.00", categories: ["coffee"], expires_in_days: 7 })]);
+    const { app, walletRef } = setup(llm);
+    const r = await request(app).post("/api/mandates/draft").send({ text: "coffee, $20 a week", userId: "u1", walletRef });
+    expect(r.status).toBe(200);
+    expect(llm.create).toHaveBeenCalledTimes(2);
   });
   it("rejects model output that fails the schema", async () => {
     const llm = fakeLlm([toolUse("propose_mandate", { summary: "x", budget_amount: "lots", budget_period: "month", approval_above: "25", categories: ["weapons"], expires_in_days: 30 })]);

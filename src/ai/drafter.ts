@@ -26,12 +26,15 @@ export interface MandateDraft { mandate: IntentMandateInput; clarifications: str
 
 /** Natural language → mandate draft. The draft is validated by the same schema as manual input and is not saved until the user confirms. */
 export async function draftMandate(llm: LlmClient, model: string, text: string, ctx: { userId: string; walletRef: string; now?: Date }): Promise<MandateDraft> {
-  const msg = await llm.messages.create({
-    model, max_tokens: 1024, tools: [TOOL], tool_choice: { type: "tool", name: TOOL.name },
-    system: "You turn a person's instructions for a shopping agent into a narrow, explicit spending mandate. Be conservative: when unsure, choose the smaller budget and the lower approval threshold, and add a clarification.",
-    messages: [{ role: "user", content: text.slice(0, 2000) }],
-  });
-  const use = msg.content.find((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
+  // Newer models reject forced tool_choice, so ask for the tool and retry once if the model answers in prose.
+  const system = "You turn a person's instructions for a shopping agent into a narrow, explicit spending mandate. Always respond by calling propose_mandate exactly once. Be conservative: when unsure, choose the smaller budget and the lower approval threshold, and add a clarification.";
+  const messages: Anthropic.MessageParam[] = [{ role: "user", content: text.slice(0, 2000) }];
+  let use: Anthropic.ToolUseBlock | undefined;
+  for (let attempt = 0; attempt < 2 && !use; attempt++) {
+    const msg = await llm.messages.create({ model, max_tokens: 1024, tools: [TOOL], tool_choice: { type: "auto" }, system, messages });
+    use = msg.content.find((b): b is Anthropic.ToolUseBlock => b.type === "tool_use" && b.name === TOOL.name);
+    if (!use) messages.push({ role: "assistant", content: msg.content }, { role: "user", content: "Please call propose_mandate now." });
+  }
   if (!use) throw new Error("model did not propose a mandate");
   const i = use.input as any;
   const now = ctx.now ?? new Date();
