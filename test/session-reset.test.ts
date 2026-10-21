@@ -73,3 +73,14 @@ describe("session reset", () => {
     expect(wallets.list("b")).toHaveLength(1);
   });
 });
+
+describe("setup before PayPal", () => {
+  it("previews a draft with no linked wallet, but never signs one", async () => {
+    const { app, who } = setup(); who.id = "fresh";
+    const d = { summary: "x", budget: { amount: "100.00", period: "month" }, approvalAbove: "25.00", categories: ["coffee"], expiresAt: "2027-01-01T00:00:00Z", walletRef: "pending" };
+    const pv = await request(app).post("/api/mandates/preview").send(d);
+    expect(pv.status).toBe(200);
+    expect(pv.body.map((r: any) => r.decision)).toEqual(["allow", "needs_approval", "deny"]);
+    expect((await request(app).post("/api/mandates").send({ ...d, userId: "fresh" })).status).toBe(404);
+  });
+});

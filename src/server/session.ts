@@ -35,14 +35,16 @@ export function ownership(ownerOf: OwnerOf, svc: MandateService, wallets: Wallet
     const owner = (req.owner = ownerOf(req, res));
     const p = req.path.split("/"); // ["", "api", resource, id, action]
     const [resource, id] = [p[2], p[3]];
-    if (resource === "mandates" && id && id !== "draft" && !ownsMandate(owner, id)) return notFound(res);
+    if (resource === "mandates" && id && id !== "draft" && id !== "preview" && !ownsMandate(owner, id)) return notFound(res);
     if (resource === "cart-mandates" && id && !ownsMandate(owner, svc.carts.get(id)?.mandateId)) return notFound(res);
     if (resource === "receipts" && id && !ownsMandate(owner, svc.receipts.get(id)?.mandateId)) return notFound(res);
     if (resource === "agent-keys" && id && !ownsMandate(owner, keys.get(id)?.mandateId)) return notFound(res);
     const mandateId = req.body?.mandateId ?? req.query.mandateId;
     if (mandateId !== undefined && !ownsMandate(owner, mandateId)) return notFound(res);
     const walletRef = req.body?.walletRef;
-    if (walletRef !== undefined && !ownsWallet(owner, walletRef)) return notFound(res);
+    // Drafting and previewing happen before PayPal is linked; they never touch money, so "pending" is allowed there only.
+    const unlinkedOk = walletRef === "pending" && req.method === "POST" && (req.path === "/api/mandates/draft" || req.path === "/api/mandates/preview");
+    if (walletRef !== undefined && !unlinkedOk && !ownsWallet(owner, walletRef)) return notFound(res);
     // Mandates always belong to the session that signs them.
     if (req.method === "POST" && (req.path === "/api/mandates" || req.path === "/api/mandates/draft") && req.body && typeof req.body === "object") req.body.userId = owner;
     next();

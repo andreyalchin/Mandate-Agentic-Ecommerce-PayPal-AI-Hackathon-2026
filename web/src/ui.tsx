@@ -34,6 +34,17 @@ export const Icon = {
   archive: (s = 16) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden {...P}><path d="M3 5h18v4H3zM5 9v10h14V9M10 13h4" /></svg>,
   sparkle: (s = 16) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden {...P}><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z" /></svg>,
   key: (s = 14) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden {...P}><circle cx="8" cy="15" r="4" /><path d="M11 12l8-8M16 7l2 2M14 9l2 2" /></svg>,
+  coffee: (s = 18) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden {...P}><path d="M4 9h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V9zM17 11h1.5a2.5 2.5 0 0 1 0 5H17M8 3v3M12 3v3" /></svg>,
+  home: (s = 18) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden {...P}><path d="M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1v-9z" /></svg>,
+  book: (s = 18) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden {...P}><path d="M5 4h10a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4zM5 17a3 3 0 0 1 3-3h10" /></svg>,
+  gift: (s = 18) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden {...P}><path d="M4 10h16v10H4zM3 7h18v3H3zM12 7v13M12 7c-1.5-3-5-3.5-5-1.5S10 7 12 7zm0 0c1.5-3 5-3.5 5-1.5S14 7 12 7z" /></svg>,
+  pot: (s = 18) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden {...P}><path d="M4 10h16v6a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4v-6zM2 10h2M20 10h2M9 6c0-1 1-1 1-2M14 6c0-1 1-1 1-2" /></svg>,
+  chip: (s = 18) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden {...P}><rect x="6" y="6" width="12" height="12" rx="2" /><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4" /></svg>,
+  cloud: (s = 18) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden {...P}><path d="M7 18a4 4 0 0 1-.5-8A6 6 0 0 1 18 9a4.5 4.5 0 0 1-.5 9H7z" /></svg>,
+  pen: (s = 16) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden {...P}><path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4" /></svg>,
+  lock: (s = 16) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden {...P}><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>,
+  terminal: (s = 18) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden {...P}><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M7 9l3 3-3 3M12 15h5" /></svg>,
+  arrowRight: (s = 16) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden {...P}><path d="M5 12h14M13 6l6 6-6 6" /></svg>,
 };
 
 export function Wordmark() {

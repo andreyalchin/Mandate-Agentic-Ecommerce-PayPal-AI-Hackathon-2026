@@ -82,6 +82,8 @@ export function consoleRoutes(svc: MandateService, llm?: Llm) {
     const live = { attempts: all.attempts.filter((a) => mine.has(a.mandateId)), mandates: all.mandates.filter((m) => mine.has(m.id)) }; const sim = q.query.simulated === "0" ? { attempts: [], mandates: [] } : simulatedRows();
     s.json({ asOf: new Date().toISOString(), attempts: [...sim.attempts, ...live.attempts].sort((a, b) => a.at.localeCompare(b.at)), mandates: [...sim.mandates, ...live.mandates] });
   });
+  // Sample orders for the Orders page ("Sample" toggle): same simulated household as Spending. Never charged.
+  r.get("/api/sample/orders", (_q, s) => { const sim = simulatedRows(); s.json({ orders: sim.orders, mandates: sim.mandates.map((m) => ({ id: m.id, title: m.title, status: m.status })) }); });
   r.post("/api/studio/turn", async (q, s, next) => {
     try {
       if (!llm) { s.status(503).json({ error: "UNAVAILABLE", message: "AI not configured" }); return; }

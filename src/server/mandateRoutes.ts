@@ -5,8 +5,22 @@ import { CATALOG, cartLines, findProducts } from "./catalog.js";
 import type { LlmClient } from "../ai/claude.js";
 import { draftMandate } from "../ai/drafter.js";
 import { runAgent } from "../ai/agent.js";
+import { evaluate } from "../mandate/policy.js";
+import { IntentMandateInput, type CartLine, type Category, type IntentMandate } from "../mandate/types.js";
 
 export interface Llm { client: LlmClient; model: () => Promise<string> }
+
+/** Everyday examples per category, used only to preview how a draft mandate would decide. Never sold. */
+const EXAMPLES: Record<Category, [string, string, string][]> = {
+  coffee: [["Coffee beans, 1 lb", "18.00", "Ridgeline Roasters"], ["Burr grinder", "79.00", "Ridgeline Roasters"]],
+  kitchen: [["Gooseneck kettle", "34.00", "Corner Supply Co."], ["Stand mixer", "279.00", "Corner Supply Co."]],
+  household: [["Dish soap refill", "9.00", "Corner Supply Co."], ["Cordless vacuum", "189.00", "Corner Supply Co."]],
+  books: [["Paperback novel", "16.00", "Pageturner Books"], ["Art book, hardcover", "65.00", "Pageturner Books"]],
+  electronics: [["USB-C cable", "12.00", "Volt Outlet"], ["Wireless headphones", "149.00", "Volt Outlet"]],
+  gifts: [["Greeting card", "6.00", "Bloom & Co."], ["Flower bouquet", "55.00", "Bloom & Co."]],
+  digital: [["Brewing guide e-book", "4.99", "Ridgeline Roasters"], ["Photo app, 1 year", "59.99", "App Store"]],
+};
+const line = (c: Category, [name, unitAmount, merchant]: [string, string, string]): CartLine => ({ sku: `preview-${c}-${name}`, name, unitAmount, quantity: 1, category: c, merchant });
 
 const Items = z.array(z.object({ sku: z.string().min(1), quantity: z.number().int().min(1).max(20) })).min(1);
 
@@ -15,7 +29,8 @@ export function mandateRoutes(svc: MandateService, publicOrigin: string, llm?: L
   const needLlm = () => { if (!llm) throw Object.assign(new Error("AI not configured"), { status: 503 }); return llm; };
   r.post("/api/mandates/draft", async (q, s, next) => {
     try {
-      const { text, userId, walletRef } = z.object({ text: z.string().min(3).max(2000), userId: z.string().min(1), walletRef: z.string().min(1) }).parse(q.body);
+      // walletRef is optional: people describe what they want before linking PayPal; it's filled in at signing.
+      const { text, userId, walletRef } = z.object({ text: z.string().min(3).max(2000), userId: z.string().min(1), walletRef: z.string().min(1).default("pending") }).parse(q.body);
       const l = needLlm();
       s.json(await draftMandate(l.client, await l.model(), text, { userId, walletRef }));
     } catch (e) { next(e); }
@@ -26,6 +41,17 @@ export function mandateRoutes(svc: MandateService, publicOrigin: string, llm?: L
       const l = needLlm();
       s.json(await runAgent(l.client, await l.model(), svc, mandateId, message, undefined, undefined, history));
     } catch (e) { next(e); }
+  });
+  // "What would happen": runs the real policy engine on everyday examples for an unsigned draft. No money, no state.
+  r.post("/api/mandates/preview", (q, s) => {
+    const d = IntentMandateInput.parse({ walletRef: "pending", userId: "preview", ...q.body });
+    const m: IntentMandate = { ...d, id: "preview", createdAt: new Date().toISOString(), status: "active", signature: "preview" };
+    const inCat = m.categories.flatMap((c) => EXAMPLES[c].map((e) => line(c, e)));
+    const cheap = inCat.filter((l) => Number(l.unitAmount) <= Number(m.approvalAbove)).sort((a, b) => Number(b.unitAmount) - Number(a.unitAmount))[0];
+    const pricey = inCat.filter((l) => Number(l.unitAmount) > Number(m.approvalAbove)).sort((a, b) => Number(a.unitAmount) - Number(b.unitAmount))[0];
+    const outCat = (Object.keys(EXAMPLES) as Category[]).find((c) => !m.categories.includes(c));
+    const picks = [cheap, pricey, outCat ? line(outCat, EXAMPLES[outCat][1]) : undefined].filter(Boolean) as CartLine[];
+    s.json(picks.map((l) => { const p = evaluate(m, [l], [], "preview"); return { name: l.name, price: l.unitAmount, merchant: l.merchant, category: l.category, decision: p.decision, reason: p.reason }; }));
   });
   r.get("/.well-known/mandate-keys", (_q, s) => s.json({ keys: [{ ...svc.signer.publicJwk(), use: "sig", alg: "EdDSA" }] }));
   r.post("/api/mandates", (q, s) => s.status(201).json(svc.create(q.body)));

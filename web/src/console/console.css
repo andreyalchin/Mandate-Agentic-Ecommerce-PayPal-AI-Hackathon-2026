@@ -9,7 +9,9 @@
 .empty-report { display: grid; justify-items: center; text-align: center; gap: 10px; padding: 56px 24px; }
 
 /* View mode: no hover chrome on widgets; the report should feel like a finished page. */
-.console:not(.editing) .ag-studio-widget-toolbar, .console:not(.editing) [class*="widget-toolbar"], .console:not(.editing) [class*="widget-menu-button"] { display: none !important; }
+/* Hide edit chrome in view mode. Never match the widget itself: AG Studio adds "...-widget-toolbar-active" to a clicked widget. */
+.console:not(.editing) .ag-studio-widget-toolbar, .console:not(.editing) [class*="widget-toolbar"]:not(.ag-studio-layout-widget), .console:not(.editing) [class*="widget-menu-button"] { display: none !important; }
+.console:not(.editing) .ag-studio-layout-widget-toolbar-active .ag-studio-layout-widget-container { outline: none; box-shadow: none; }
 .console:not(.editing) [class*="ag-studio-widget"] { cursor: default; }
 .console:not(.editing) [class*="ag-studio-widget"]:hover { box-shadow: none !important; outline: none !important; }
 

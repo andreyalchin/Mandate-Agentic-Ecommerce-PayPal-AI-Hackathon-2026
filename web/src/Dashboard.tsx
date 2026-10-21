@@ -78,9 +78,7 @@ function MandateCard({ st, onRevoke }: { st: MandateState; onRevoke: () => void 
         <div><dt>Shops</dt><dd>{m.merchants?.length ? m.merchants.join(", ") : "Any"}</dd></div>
       </dl>
       <footer className="mandate-foot">
-        <a className="sig" href="/.well-known/mandate-keys" target="_blank" rel="noreferrer" title={`Signature fingerprint ${st.fingerprint}`}>
-          {st.signatureValid ? <>{Icon.shield(14)} Signed · Ed25519</> : <span className="bad-t">Signature invalid</span>}
-        </a>
+        <LockBadge valid={st.signatureValid} fingerprint={st.fingerprint} />
         {m.status === "active" && (confirm
           ? <span className="row"><button className="btn danger xs" onClick={onRevoke}>Revoke</button><button className="btn ghost xs" onClick={() => setConfirm(false)}>Keep</button></span>
           : <button className="btn ghost xs" onClick={() => setConfirm(true)}>Revoke</button>)}
@@ -89,30 +87,108 @@ function MandateCard({ st, onRevoke }: { st: MandateState; onRevoke: () => void 
   );
 }
 
-function ConnectAgent({ mandateId, active }: { mandateId: string; active: boolean }) {
-  const [open, setOpen] = useState(false); const [name, setName] = useState("Claude Code");
-  const [issued, setIssued] = useState<{ key: string; mcpUrl: string; agentName: string } | null>(null);
-  const [keys, setKeys] = useState<{ id: string; agentName: string; lastUsedAt?: string; revoked?: boolean }[]>([]);
-  const [copied, setCopied] = useState<string | null>(null);
-  const load = useCallback(() => api(`/api/mandates/${mandateId}/agent-keys`).then(setKeys).catch(() => {}), [mandateId]);
+/** Plain-language explanation of the mandate signature; technical detail is tucked behind a disclosure. */
+function LockBadge({ valid, fingerprint }: { valid: boolean; fingerprint: string }) {
+  const [open, setOpen] = useState(false); const ref = useDismiss(open, () => setOpen(false));
+  return (
+    <div className="lock" ref={ref}>
+      <button className={`sig ${valid ? "" : "bad"}`} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        {Icon.shield(14)} {valid ? "Rules locked" : "Rules changed: paused"}
+      </button>
+      {open && <div className="lock-pop menu" role="dialog" aria-label="About locked rules">
+        <p className="lock-title">{valid ? "Your rules are locked" : "These rules no longer match your signature"}</p>
+        <p className="sm muted">{valid
+          ? "When you approved these rules, Mandate sealed them with a digital signature. Every purchase is checked against that seal first, so no agent, shop, or even our server can quietly raise your budget or add a category."
+          : "Something changed after you approved them, so every purchase under this mandate is blocked. Create a new mandate to keep going."}</p>
+        <ul className="lock-list sm">
+          <li>{Icon.check(13)} Only you can change the budget or limits</li>
+          <li>{Icon.check(13)} Agents can't edit the rules they're given</li>
+          <li>{Icon.check(13)} Revoke stops all spending at once</li>
+        </ul>
+        <details className="lock-tech xs muted"><summary>Technical details</summary>
+          <p>Signed with Ed25519. Fingerprint <code>{fingerprint}</code>. Outside agents and shops can verify it with the <a href="/.well-known/mandate-keys" target="_blank" rel="noreferrer">public key</a>.</p>
+        </details>
+      </div>}
+    </div>
+  );
+}
+
+type AgentKind = "claude-code" | "claude-desktop" | "cursor" | "other";
+const AGENT_KINDS: { id: AgentKind; name: string; blurb: string; icon: (s?: number) => any }[] = [
+  { id: "claude-code", name: "Claude Code", blurb: "Paste one command in your terminal", icon: Icon.terminal },
+  { id: "claude-desktop", name: "Claude Desktop", blurb: "Add it to the app's config file", icon: Icon.bot },
+  { id: "cursor", name: "Cursor", blurb: "Add it to mcp.json", icon: Icon.pen },
+  { id: "other", name: "Any MCP agent", blurb: "Server URL and a key", icon: Icon.plug },
+];
+function snippet(kind: AgentKind, url: string, key: string) {
+  if (kind === "claude-code") return `claude mcp add --transport http mandate ${url} --header "Authorization: Bearer ${key}"`;
+  if (kind === "claude-desktop") return JSON.stringify({ mcpServers: { mandate: { command: "npx", args: ["-y", "mcp-remote", url, "--header", `Authorization: Bearer ${key}`] } } }, null, 2);
+  if (kind === "cursor") return JSON.stringify({ mcpServers: { mandate: { url, headers: { Authorization: `Bearer ${key}` } } } }, null, 2);
+  return `Server URL: ${url}\nHeader: Authorization: Bearer ${key}`;
+}
+const WHERE: Record<AgentKind, string> = {
+  "claude-code": "Run this in a terminal, then ask Claude Code to buy something.",
+  "claude-desktop": "Settings → Developer → Edit config. Paste this, save, and restart Claude Desktop.",
+  cursor: "Paste into ~/.cursor/mcp.json (or the project's .cursor/mcp.json) and reload.",
+  other: "Add a streamable-HTTP MCP server with this URL and header.",
+};
+
+/** Agents on this mandate: the built-in one, plus outside agents connected by a guided, three-step sheet. */
+function ConnectAgent({ mandateId, active, rules }: { mandateId: string; active: boolean; rules: string }) {
+  type Key = { id: string; agentName: string; lastUsedAt?: string; revoked?: boolean };
+  const [sheet, setSheet] = useState(false); const [kind, setKind] = useState<AgentKind | null>(null);
+  const [issued, setIssued] = useState<{ id?: string; key: string; mcpUrl: string; agentName: string } | null>(null);
+  const [keys, setKeys] = useState<Key[]>([]); const [copied, setCopied] = useState(false); const [busy, setBusy] = useState(false);
+  const load = useCallback(() => api<Key[]>(`/api/mandates/${mandateId}/agent-keys`).then(setKeys).catch(() => {}), [mandateId]);
   useEffect(() => { load(); }, [load]);
-  const copy = (k: string, v: string) => { navigator.clipboard?.writeText(v).then(() => { setCopied(k); setTimeout(() => setCopied(null), 1500); }).catch(() => {}); };
-  const cmd = issued ? `claude mcp add --transport http mandate ${issued.mcpUrl} --header "Authorization: Bearer ${issued.key}"` : "";
+  const mine = issued ? keys.find((k) => k.agentName === issued.agentName && !k.revoked) : undefined;
+  const connected = !!mine?.lastUsedAt;
+  useEffect(() => { if (!sheet || !issued || connected) return; const t = setInterval(load, 3000); return () => clearInterval(t); }, [sheet, issued, connected, load]);
+  useEffect(() => { if (!sheet) return; const k = (e: KeyboardEvent) => e.key === "Escape" && close(); addEventListener("keydown", k); return () => removeEventListener("keydown", k); }, [sheet]);
+  function close() { setSheet(false); setKind(null); setIssued(null); setCopied(false); }
+  async function choose(k: AgentKind) {
+    setKind(k); setBusy(true);
+    const base = AGENT_KINDS.find((a) => a.id === k)!.name; const taken = new Set(keys.filter((x) => !x.revoked).map((x) => x.agentName));
+    let name = base; for (let i = 2; taken.has(name); i++) name = `${base} ${i}`;
+    try { setIssued(await api(`/api/mandates/${mandateId}/agent-keys`, { agentName: name })); load(); } finally { setBusy(false); }
+  }
   const live = keys.filter((k) => !k.revoked);
+  const text = issued && kind ? snippet(kind, issued.mcpUrl, issued.key) : "";
   return (
     <section className="card connect" aria-labelledby="ch">
-      <header className="card-head"><h2 id="ch" className="card-title">{Icon.plug(15)} Outside agents</h2><span className="tag">MCP</span></header>
-      <p className="sm muted">Give any MCP agent a key that can only spend through this mandate.</p>
-      {live.map((k) => <div key={k.id} className="keyrow"><span className="key-name">{k.agentName}</span><span className="muted xs">{k.lastUsedAt ? `used ${timeOf(k.lastUsedAt)}` : "not used yet"}</span><button className="link" onClick={async () => { await api(`/api/agent-keys/${k.id}/revoke`, {}); load(); }}>Revoke</button></div>)}
-      {!open && !issued && <button className="btn sm" disabled={!active} onClick={() => setOpen(true)}>Connect an agent</button>}
-      {open && !issued && <form className="row" onSubmit={async (e) => { e.preventDefault(); const r = await api(`/api/mandates/${mandateId}/agent-keys`, { agentName: name }); setIssued(r); setOpen(false); load(); }}>
-        <label className="sr" htmlFor="an">Agent name</label><input id="an" className="field" value={name} onChange={(e) => setName(e.target.value)} maxLength={40} /><button className="btn primary sm">Create key</button></form>}
-      {issued && <div className="issued">
-        <p className="xs muted">Copy now. The key is shown once.</p>
-        <div className="copyrow"><code>{issued.mcpUrl}</code><button className="link" onClick={() => copy("url", issued.mcpUrl)}>{copied === "url" ? "Copied" : "Copy URL"}</button></div>
-        <div className="copyrow"><code>{issued.key.slice(0, 14)}…</code><button className="link" onClick={() => copy("key", issued.key)}>{copied === "key" ? "Copied" : "Copy key"}</button></div>
-        <div className="copyrow"><code>claude mcp add …</code><button className="link" onClick={() => copy("cmd", cmd)}>{copied === "cmd" ? "Copied" : "Copy command"}</button></div>
-        <button className="link" onClick={() => setIssued(null)}>Done</button>
+      <header className="card-head"><h2 id="ch" className="card-title">{Icon.bot(15)} Agents</h2><span className="muted xs">{live.length + 1} can spend</span></header>
+      <ul className="agent-list">
+        <li><span className="av">SA</span><span className="al-main"><b>Shopping agent</b><span className="xs muted">Built in · chat on this page</span></span><span className="pill ok">On</span></li>
+        {live.map((k) => <li key={k.id}><span className="av alt">{k.agentName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()}</span>
+          <span className="al-main"><b>{k.agentName}</b><span className="xs muted">{k.lastUsedAt ? `Last used ${timeOf(k.lastUsedAt)}` : "Waiting for first use"}</span></span>
+          <button className="link xs" onClick={async () => { await api(`/api/agent-keys/${k.id}/revoke`, {}); load(); }}>Remove</button></li>)}
+      </ul>
+      <button className="btn sm block" disabled={!active} onClick={() => setSheet(true)}>{Icon.plus(15)} Add an agent</button>
+      {sheet && <div className="sheet-bg" onMouseDown={(e) => e.target === e.currentTarget && close()}>
+        <div className="sheet card" role="dialog" aria-modal="true" aria-labelledby="sh-t">
+          <header className="sheet-head">
+            <div><p className="eyebrow">Step {!kind ? 1 : connected ? 3 : 2} of 3</p><h2 id="sh-t">{!kind ? "Which agent should shop for you?" : connected ? `${issued?.agentName} is connected` : `Connect ${issued?.agentName ?? "your agent"}`}</h2></div>
+            <button className="icon-btn" aria-label="Close" onClick={close}>{Icon.x(16)}</button>
+          </header>
+          {!kind && <>
+            <div className="kind-grid">{AGENT_KINDS.map((a) => <button key={a.id} className="kind" onClick={() => choose(a.id)}><span className="tpl-ic">{a.icon(18)}</span><span className="tpl-text"><b>{a.name}</b><span>{a.blurb}</span></span>{Icon.chevron(14)}</button>)}</div>
+            <p className="sheet-rules sm">{Icon.lock(14)} <span>It can only spend inside <b>{rules}</b>. Everything else comes back to you.</span></p>
+          </>}
+          {kind && busy && <div className="row center" style={{ padding: 24 }}><Spinner /> Creating a key…</div>}
+          {kind && issued && !connected && <>
+            <ol className="how">
+              <li><b>Copy this</b><span className="xs muted">{WHERE[kind]}</span></li>
+            </ol>
+            <div className="snippet"><pre>{text}</pre><button className="btn sm primary" onClick={() => navigator.clipboard?.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800); })}>{copied ? <>{Icon.check(14)} Copied</> : "Copy"}</button></div>
+            <p className="xs muted">The key is shown only once and works only for this mandate. Remove the agent anytime to cut it off.</p>
+            <div className="waiting">{Icon.refresh(14)} Waiting for {issued.agentName} to connect… <span className="xs muted">Ask it something like "buy coffee filters".</span></div>
+            <footer className="sheet-foot"><button className="btn ghost sm" onClick={() => { setKind(null); setIssued(null); }}>Back</button><button className="btn sm" onClick={close}>I'll finish later</button></footer>
+          </>}
+          {connected && <>
+            <div className="done-state"><span className="done-ic">{Icon.check(22)}</span><p>{issued?.agentName} just used its key. Its purchases show up in Orders and Spending, labeled with its name.</p></div>
+            <footer className="sheet-foot"><a className="btn sm" href="#/orders" onClick={close}>See orders</a><button className="btn sm primary" onClick={close}>Done</button></footer>
+          </>}
+        </div>
       </div>}
     </section>
   );
@@ -313,7 +389,7 @@ export function Dashboard({ mandateId, mandates, onSelect, onNew, onChanged, onR
         <MandateSwitcher mandates={mandates} current={mandateId} onSelect={onSelect} onNew={onNew} />
         {st ? <MandateCard st={st} onRevoke={async () => { await api(`/api/mandates/${mandateId}/revoke`, {}); refresh(); onChanged(); }} /> : <section className="card"><Skeleton lines={6} /></section>}
         {st?.mandate.status === "revoked" && <button className="btn primary full" onClick={onNew}>{Icon.plus(15)} Create a new mandate</button>}
-        {st && st.mandate.status === "active" && <ConnectAgent mandateId={mandateId} active />}
+        {st && st.mandate.status === "active" && <ConnectAgent mandateId={mandateId} active rules={`${mandateTitle(st.mandate)}, asks over ${amt(st.mandate.approvalAbove)}`} />}
       </div>
       <div className="col-chat pane-chat">
         <Agent mandateId={mandateId} active={st?.mandate.status !== "revoked"} onChange={refresh} notes={notes} onToast={setToast} />

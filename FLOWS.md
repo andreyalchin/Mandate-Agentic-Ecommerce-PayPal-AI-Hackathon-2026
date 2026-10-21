@@ -37,3 +37,18 @@ Tabs Overview / Agents. Filters: period (This month / 30 / 90 days / All time), 
 Data belongs to the browser session, never shared across testers. Account menu:
 - **Start fresh**: deletes this browser's mandates, orders, agent keys and history; PayPal stays linked.
 - **New tester**: same, and also unlinks PayPal and drops the session cookie, so the next person starts at setup.
+
+## Setup v4 (value first, PayPal last)
+1. **Choose**: tap a template (Coffee runs, Household basics, Kitchen restock, Books, Gifts, Cables & gadgets) or type/speak your own (Claude drafts it).
+2. **Set limits**: budget presets ($25/$50/$100/$200 or custom), per week/month/one-time, ask-above presets, categories, end date. The one-sentence rules update live, and "What your agent would do" runs the real policy engine on three everyday examples (Buys it / Asks you first / Won't buy) via `POST /api/mandates/preview`.
+3. **Activate**: if PayPal is already linked, "Approve and activate"; otherwise the PayPal button links and activates in one go. The draft survives reloads (sessionStorage `mandate.setupDraft`).
+Drafting and previewing accept `walletRef: "pending"`; signing still requires a wallet you own.
+
+## Agents card + Add an agent
+The Agent page's Agents card lists the built-in Shopping agent and each connected outside agent. **Add an agent** opens a 3-step sheet: pick Claude Code / Claude Desktop / Cursor / Any MCP agent; copy the ready-made snippet (command or JSON config with the key filled in); the sheet waits and flips to "connected" the first time the agent uses its key. Remove cuts an agent off.
+
+## Rules locked badge
+"Rules locked" opens a plain-language explainer; the Ed25519 fingerprint and public key link sit under "Technical details".
+
+## Orders v4
+"Your orders / Sample" toggle (sample = 46 simulated orders from 7 agents, paid and refunded). Filters: status with counts, search (item, shop, agent), period, mandate, and agent chips with counts. Each row and receipt shows which agent bought it.

@@ -41,7 +41,16 @@ describe("spend console data", () => {
     expect(a.attempts.length).toBeGreaterThan(20);
     expect(new Set(a.attempts.map((x) => x.outcome))).toEqual(new Set(["Allowed", "Approved by you", "Declined by you", "Blocked", "Refunded"].filter((o) => a.attempts.some((x) => x.outcome === o))));
     expect(a.attempts.every((x) => x.source === "Simulated")).toBe(true);
-    expect(a.attempts.filter((x) => x.category === "electronics").every((x) => x.outcome === "Blocked")).toBe(true);
+    // Headphones are electronics: outside the coffee mandate, so the engine blocks them there.
+    expect(a.attempts.filter((x) => x.category === "electronics" && x.mandateId === "sim_coffee").every((x) => x.outcome === "Blocked")).toBe(true);
+    expect(new Set(a.attempts.map((x) => x.agent)).size).toBeGreaterThanOrEqual(7);
+  });
+  it("sample orders are exactly the paid, approved and refunded attempts, with a ship-to", () => {
+    const a = simulatedRows(new Date("2026-11-01T12:00:00Z"));
+    const paid = a.attempts.filter((x) => ["Allowed", "Approved by you", "Refunded"].includes(x.outcome));
+    expect(a.orders.map((o) => o.id).sort()).toEqual(paid.map((x) => x.id).sort());
+    expect(new Set(a.orders.map((o) => o.status))).toEqual(new Set(["captured", "refunded"]));
+    expect(a.orders.every((o) => o.sample && o.shipTo?.city === "Portland" && o.orderId.startsWith("SAMPLE-"))).toBe(true);
   });
   it("merges live rows labelled Live", async () => {
     const pay = fakePay(); const wallets = new WalletStore(); const w = wallets.save("V", undefined, undefined, "u1");
