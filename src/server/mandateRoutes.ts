@@ -2,11 +2,31 @@ import { Router } from "express";
 import { z } from "zod";
 import type { MandateService } from "../mandate/service.js";
 import { cartLines } from "./catalog.js";
+import type { LlmClient } from "../ai/claude.js";
+import { draftMandate } from "../ai/drafter.js";
+import { runAgent } from "../ai/agent.js";
+
+export interface Llm { client: LlmClient; model: () => Promise<string> }
 
 const Items = z.array(z.object({ sku: z.string().min(1), quantity: z.number().int().min(1).max(20) })).min(1);
 
-export function mandateRoutes(svc: MandateService, publicOrigin: string) {
+export function mandateRoutes(svc: MandateService, publicOrigin: string, llm?: Llm) {
   const r = Router();
+  const needLlm = () => { if (!llm) throw Object.assign(new Error("AI not configured"), { status: 503 }); return llm; };
+  r.post("/api/mandates/draft", async (q, s, next) => {
+    try {
+      const { text, userId, walletRef } = z.object({ text: z.string().min(3).max(2000), userId: z.string().min(1), walletRef: z.string().min(1) }).parse(q.body);
+      const l = needLlm();
+      s.json(await draftMandate(l.client, await l.model(), text, { userId, walletRef }));
+    } catch (e) { next(e); }
+  });
+  r.post("/api/agent/chat", async (q, s, next) => {
+    try {
+      const { mandateId, message } = z.object({ mandateId: z.string(), message: z.string().min(1).max(2000) }).parse(q.body);
+      const l = needLlm();
+      s.json(await runAgent(l.client, await l.model(), svc, mandateId, message));
+    } catch (e) { next(e); }
+  });
   r.get("/.well-known/mandate-keys", (_q, s) => s.json({ keys: [{ ...svc.signer.publicJwk(), use: "sig", alg: "EdDSA" }] }));
   r.post("/api/mandates", (q, s) => s.status(201).json(svc.create(q.body)));
   r.get("/api/mandates/:id", (q, s) => { const m = svc.mandates.get(q.params.id); m ? s.json(m) : s.status(404).json({ error: "NOT_FOUND" }); });

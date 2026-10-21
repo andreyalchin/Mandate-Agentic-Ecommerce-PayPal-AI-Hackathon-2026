@@ -8,13 +8,13 @@ import {
 import { priceCart } from "./catalog.js";
 import { WalletStore } from "./walletStore.js";
 import { MandateService } from "../mandate/service.js";
-import { mandateRoutes } from "./mandateRoutes.js";
+import { mandateRoutes, type Llm } from "./mandateRoutes.js";
 
-export interface Deps { cfg: PayPalConfig; pay: PayPalPayments; rest: PayPalRest; wallets?: WalletStore; mandates?: MandateService; onEvent?: (e: any) => void | Promise<void> }
+export interface Deps { cfg: PayPalConfig; pay: PayPalPayments; rest: PayPalRest; wallets?: WalletStore; mandates?: MandateService; llm?: Llm; onEvent?: (e: any) => void | Promise<void> }
 
 const Cart = z.object({ items: z.array(z.object({ sku: z.string().min(1), quantity: z.number().int().min(1).max(20) })).min(1) });
 
-export function createApp({ cfg, pay, rest, wallets = new WalletStore(), mandates, onEvent }: Deps) {
+export function createApp({ cfg, pay, rest, wallets = new WalletStore(), mandates, llm, onEvent }: Deps) {
   const svc = mandates ?? new MandateService(pay, wallets);
   const app = express();
   const inbox = new WebhookInbox();
@@ -37,7 +37,7 @@ export function createApp({ cfg, pay, rest, wallets = new WalletStore(), mandate
   app.use(express.json({ limit: "100kb" }));
   app.use(express.static(path.resolve("public")));
 
-  app.use(mandateRoutes(svc, cfg.publicOrigin));
+  app.use(mandateRoutes(svc, cfg.publicOrigin, llm));
 
   app.get("/api/health", (_req, res) => res.json({ ok: true, env: cfg.env }));
 
@@ -120,6 +120,7 @@ export function createApp({ cfg, pay, rest, wallets = new WalletStore(), mandate
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     if (err instanceof z.ZodError) return res.status(400).json({ error: "INVALID_REQUEST", issues: err.issues });
     const st = (err as any)?.status;
+    if (!(err instanceof PayPalError) && st === 503) return res.status(503).json({ error: "UNAVAILABLE", message: (err as Error).message });
     if (!(err instanceof PayPalError) && typeof st === "number" && st >= 400 && st < 500) return res.status(st).json({ error: st === 404 ? "NOT_FOUND" : st === 409 ? "CONFLICT" : "INVALID_REQUEST", message: (err as Error).message });
     const e = normalizeError(err);
     const status = e.isInstrumentDeclined ? 422 : e.status >= 400 && e.status < 600 ? e.status : 502;
