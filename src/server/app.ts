@@ -1,3 +1,4 @@
+import compression from "compression";
 import express, { type NextFunction, type Request, type Response } from "express";
 import path from "node:path";
 import { z } from "zod";
@@ -10,6 +11,7 @@ import { WalletStore } from "./walletStore.js";
 import { MandateService } from "../mandate/service.js";
 import { mandateRoutes, type Llm } from "./mandateRoutes.js";
 import { mcpRoutes } from "../mcp/server.js";
+import { consoleRoutes } from "../console/studioLlm.js";
 import { AgentKeyStore } from "../mcp/agentKeys.js";
 
 export interface Deps { cfg: PayPalConfig; pay: PayPalPayments; rest: PayPalRest; wallets?: WalletStore; mandates?: MandateService; agentKeys?: AgentKeyStore; llm?: Llm; onEvent?: (e: any) => void | Promise<void> }
@@ -36,18 +38,22 @@ export function createApp({ cfg, pay, rest, wallets = new WalletStore(), mandate
     } catch (e) { next(e); }
   });
 
+  // AG Studio turns carry the dashboard schema and conversation, so allow more there.
+  app.use("/api/studio", express.json({ limit: "1mb" }));
   app.use(express.json({ limit: "100kb" }));
   // Product UI (Vite build) first, then the developer harness at /harness.html.
-  app.use(express.static(path.resolve("dist/web")));
+  app.use(compression());
+  app.use(express.static(path.resolve("dist/web"), { maxAge: "1h" }));
   app.use(express.static(path.resolve("public")));
 
   app.use(mandateRoutes(svc, cfg.publicOrigin, llm));
   app.use(mcpRoutes(svc, agentKeys, cfg.publicOrigin));
+  app.use(consoleRoutes(svc, llm));
 
   app.get("/api/health", (_req, res) => res.json({ ok: true, env: cfg.env }));
 
   app.get("/api/wallets", (_req, res) => res.json(wallets.list()));
-  app.get("/api/config", (_req, res) => res.json({ env: cfg.env, sdkUrl: webSdkUrl(cfg.env), clientId: cfg.clientId.startsWith("proxy") ? undefined : cfg.clientId }));
+  app.get("/api/config", (_req, res) => res.json({ env: cfg.env, sdkUrl: webSdkUrl(cfg.env), clientId: cfg.clientId.startsWith("proxy") ? undefined : cfg.clientId, agStudioLicense: process.env.AG_STUDIO_LICENSE || undefined }));
 
   app.post("/api/client-token", async (_req, res, next) => {
     try {

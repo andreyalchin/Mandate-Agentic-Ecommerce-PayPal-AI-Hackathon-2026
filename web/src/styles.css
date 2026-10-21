@@ -20,7 +20,10 @@ a { color: var(--accent); text-underline-offset: 3px; }
 .app { min-height: 100vh; display: flex; flex-direction: column; }
 .top { display: flex; justify-content: space-between; align-items: center; padding: 14px 28px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--paper) 88%, white); position: sticky; top: 0; z-index: 5; backdrop-filter: blur(6px); }
 .wordmark { display: inline-flex; align-items: center; gap: 10px; font: 600 17px var(--font-body); letter-spacing: -.01em; color: var(--accent); }
-.wordmark { color: var(--ink); } .wordmark svg { color: var(--accent); }
+.wordmark { color: var(--ink); }
+.nav-left { gap: 28px; } .tabs { display: flex; gap: 4px; } .tabs a { text-decoration: none; color: var(--muted); font-size: 14px; font-weight: 600; padding: 6px 10px; border-radius: 8px; }
+.tabs a:hover { color: var(--ink); background: var(--surface-2); } .tabs a.on { color: var(--ink); background: var(--surface-2); }
+@media (max-width: 560px) { .nav-left { gap: 10px; } .tabs a { padding: 6px 7px; font-size: 13px; } .top .pill:first-child { display: none; } } .wordmark svg { color: var(--accent); }
 .foot { margin-top: auto; display: flex; justify-content: space-between; padding: 18px 28px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); }
 .foot a { color: var(--muted); }
 

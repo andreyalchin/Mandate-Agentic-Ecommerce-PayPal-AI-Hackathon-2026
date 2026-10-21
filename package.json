@@ -18,6 +18,10 @@
     "@anthropic-ai/sdk": "^1.0.0",
     "@modelcontextprotocol/sdk": "^1.32.1",
     "@paypal/paypal-server-sdk": "2.5.0",
+    "@types/compression": "^1.8.1",
+    "ag-studio": "^3.0.0",
+    "ag-studio-react": "^3.0.0",
+    "compression": "^1.8.2",
     "express": "^5.1.0",
     "undici": "^7.30.1",
     "zod": "^3.25.0"
