@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import type { MandateService } from "../mandate/service.js";
-import { cartLines } from "./catalog.js";
+import { CATALOG, cartLines } from "./catalog.js";
 import type { LlmClient } from "../ai/claude.js";
 import { draftMandate } from "../ai/drafter.js";
 import { runAgent } from "../ai/agent.js";
@@ -22,13 +22,17 @@ export function mandateRoutes(svc: MandateService, publicOrigin: string, llm?: L
   });
   r.post("/api/agent/chat", async (q, s, next) => {
     try {
-      const { mandateId, message } = z.object({ mandateId: z.string(), message: z.string().min(1).max(2000) }).parse(q.body);
+      const { mandateId, message, history } = z.object({ mandateId: z.string(), message: z.string().min(1).max(2000), history: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(4000) })).max(20).optional() }).parse(q.body);
       const l = needLlm();
-      s.json(await runAgent(l.client, await l.model(), svc, mandateId, message));
+      s.json(await runAgent(l.client, await l.model(), svc, mandateId, message, undefined, undefined, history));
     } catch (e) { next(e); }
   });
   r.get("/.well-known/mandate-keys", (_q, s) => s.json({ keys: [{ ...svc.signer.publicJwk(), use: "sig", alg: "EdDSA" }] }));
   r.post("/api/mandates", (q, s) => s.status(201).json(svc.create(q.body)));
+  r.get("/api/mandates", (q, s) => s.json([...svc.mandates.values()].filter((m) => !q.query.userId || m.userId === q.query.userId).reverse()));
+  r.get("/api/mandates/:id/state", (q, s) => s.json(svc.state(q.params.id)));
+  r.get("/api/cart-mandates", (q, s) => s.json([...svc.carts.values()].filter((c) => (!q.query.mandateId || c.mandateId === q.query.mandateId) && (!q.query.status || c.status === q.query.status)).reverse()));
+  r.get("/api/products", (_q, s) => s.json(Object.values(CATALOG).map((p) => ({ sku: p.sku, name: p.name, price: p.unitAmount, category: p.mandateCategory, merchant: p.merchant }))));
   r.get("/api/mandates/:id", (q, s) => { const m = svc.mandates.get(q.params.id); m ? s.json(m) : s.status(404).json({ error: "NOT_FOUND" }); });
   r.post("/api/mandates/:id/revoke", (q, s) => s.json(svc.revoke(q.params.id)));
   r.post("/api/mandates/:id/check", (q, s) => {
@@ -49,6 +53,6 @@ export function mandateRoutes(svc: MandateService, publicOrigin: string, llm?: L
   r.post("/api/cart-mandates/:id/decline", (q, s) => s.json(svc.decline(q.params.id) ?? { error: "NOT_FOUND" }));
   r.get("/api/receipts", (q, s) => s.json([...svc.receipts.values()].filter((x) => !q.query.mandateId || x.mandateId === q.query.mandateId).reverse()));
   r.post("/api/receipts/:id/undo", async (q, s, next) => { try { s.json(await svc.undo(q.params.id)); } catch (e) { next(e); } });
-  r.get("/api/activity", (_q, s) => s.json(svc.log.slice(-200).reverse()));
+  r.get("/api/activity", (q, s) => s.json(svc.log.filter((e) => !q.query.mandateId || e.mandateId === q.query.mandateId).slice(-200).reverse()));
   return r;
 }

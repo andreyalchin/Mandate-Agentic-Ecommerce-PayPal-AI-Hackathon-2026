@@ -29,7 +29,7 @@ describe("agent purchase under a mandate", () => {
   });
   it("returns a pending cart mandate for out-of-threshold carts, then captures after approval", async () => {
     const { app, pay, walletRef } = setup();
-    const m = (await request(app).post("/api/mandates").send({ ...body(walletRef), categories: ["coffee", "kitchen"] })).body;
+    const m = (await request(app).post("/api/mandates").send({ ...body(walletRef), categories: ["coffee"] })).body;
     const r = await request(app).post("/api/agent/purchase").send({ mandateId: m.id, agentId: "chat-agent", items: [{ sku: "COF-GRINDER", quantity: 1 }], rationale: "User said the old grinder broke" });
     expect(r.status).toBe(202);
     const cart = r.body.cartMandate;

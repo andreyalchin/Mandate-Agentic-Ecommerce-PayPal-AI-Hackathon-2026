@@ -15,5 +15,7 @@ export class WalletStore {
     return w;
   }
   get(walletRef: string) { return this.byRef.get(walletRef); }
+  /** Public view (no vault ids), newest first. */
+  list() { return [...this.byRef.values()].reverse().map(({ walletRef, label, createdAt }) => ({ walletRef, label, createdAt })); }
   delete(walletRef: string) { return this.byRef.delete(walletRef); }
 }

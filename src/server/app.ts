@@ -35,12 +35,15 @@ export function createApp({ cfg, pay, rest, wallets = new WalletStore(), mandate
   });
 
   app.use(express.json({ limit: "100kb" }));
+  // Product UI (Vite build) first, then the developer harness at /harness.html.
+  app.use(express.static(path.resolve("dist/web")));
   app.use(express.static(path.resolve("public")));
 
   app.use(mandateRoutes(svc, cfg.publicOrigin, llm));
 
   app.get("/api/health", (_req, res) => res.json({ ok: true, env: cfg.env }));
 
+  app.get("/api/wallets", (_req, res) => res.json(wallets.list()));
   app.get("/api/config", (_req, res) => res.json({ env: cfg.env, sdkUrl: webSdkUrl(cfg.env), clientId: cfg.clientId.startsWith("proxy") ? undefined : cfg.clientId }));
 
   app.post("/api/client-token", async (_req, res, next) => {

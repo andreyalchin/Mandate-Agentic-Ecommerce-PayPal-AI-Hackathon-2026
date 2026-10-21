@@ -1,7 +1,8 @@
-node_modules
-dist
+*.log
 .env
 .env.local
-*.log
 data/*.json
+dist
+dist/
 e2e/shots/
+node_modules

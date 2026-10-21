@@ -69,6 +69,12 @@ describe("shopping agent", () => {
     expect(r.body.outcomes[0].decision).toBe("deny");
     expect(pay.createOrder).not.toHaveBeenCalled();
   });
+  it("logs a blocked pre-check so the user sees the attempt", async () => {
+    const llm = fakeLlm([toolUse("check_cart", { items: [{ sku: "EL-HEADPHONES", quantity: 1 }] }, "t1"), text("Blocked by your mandate.")]);
+    const { app, svc, m } = setup(llm);
+    await request(app).post("/api/agent/chat").send({ mandateId: m.id, message: "headphones" });
+    expect(svc.log.at(-1)).toMatchObject({ decision: "deny", rule: "category", items: "1 × Wireless headphones" });
+  });
   it("returns 503 when AI is not configured", async () => {
     const pay = fakePay(); const wallets = new WalletStore();
     const app = createApp({ cfg, pay, rest: new PayPalRest(cfg, (async () => new Response("{}")) as any), wallets });

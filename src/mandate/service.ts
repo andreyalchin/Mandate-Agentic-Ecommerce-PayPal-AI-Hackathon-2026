@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { buildOrderRequest, captureIdOf, type PayPalPayments } from "../paypal/index.js";
 import type { WalletStore } from "../server/walletStore.js";
-import { evaluate, type SpendRecord } from "./policy.js";
+import { evaluate, periodStart, type SpendRecord } from "./policy.js";
 import { MandateSigner } from "./signing.js";
-import { cartCents, fmt } from "./money.js";
+import { cartCents, fmt, toCents } from "./money.js";
 import { IntentMandateInput, type CartLine, type CartMandate, type IntentMandate, type PolicyResult, type Receipt } from "./types.js";
 
 /** Mandate categories are ours; PayPal only needs physical vs digital. */
@@ -20,7 +20,7 @@ export class MandateService {
   readonly mandates = new Map<string, IntentMandate>();
   readonly carts = new Map<string, CartMandate>();
   readonly receipts = new Map<string, Receipt>();
-  readonly log: { at: string; mandateId: string; agentId: string; decision: string; rule: string; totalCents: number }[] = [];
+  readonly log: { id: string; at: string; mandateId: string; agentId: string; decision: string; rule: string; reason: string; totalCents: number; items: string; rationale: string }[] = [];
 
   constructor(private pay: PayPalPayments, private wallets: WalletStore, readonly signer = new MandateSigner(), private now = () => new Date()) {}
 
@@ -31,6 +31,15 @@ export class MandateService {
     draft.signature = this.signer.sign(signable(draft));
     this.mandates.set(draft.id, draft);
     return draft;
+  }
+
+  /** Budget usage for the current period, for the UI. */
+  state(mandateId: string) {
+    const m = this.must(mandateId);
+    const since = periodStart(m.budget.period, m.createdAt, this.now()).getTime();
+    const budgetCents = toCents(m.budget.amount);
+    const spentCents = [...this.receipts.values()].filter((r) => r.mandateId === m.id && r.status !== "refunded" && new Date(r.at).getTime() >= since).reduce((a, r) => a + r.totalCents, 0);
+    return { mandate: m, budgetCents, spentCents, remainingCents: Math.max(0, budgetCents - spentCents), periodStart: new Date(since).toISOString(), signatureValid: this.signer.verify(signable(m), m.signature), fingerprint: m.signature.slice(0, 16) };
   }
 
   revoke(mandateId: string) { const m = this.must(mandateId); m.status = "revoked"; return m; }
@@ -45,15 +54,22 @@ export class MandateService {
     return [...this.receipts.values()].map((r) => ({ mandateId: r.mandateId, totalCents: r.totalCents, at: r.at, status: r.status }));
   }
 
-  check(mandateId: string, lines: CartLine[], agentId: string): PolicyResult {
+  check(mandateId: string, lines: CartLine[], agentId: string, opts: { logDenied?: boolean; rationale?: string } = {}): PolicyResult {
     const m = this.must(mandateId);
-    return evaluate(m, lines, this.spend(), agentId, this.now(), this.signer.verify(signable(m), m.signature));
+    const policy = evaluate(m, lines, this.spend(), agentId, this.now(), this.signer.verify(signable(m), m.signature));
+    // An agent that pre-checks and gives up is still an attempt the user should see.
+    if (opts.logDenied && policy.decision === "deny") this.logAttempt(mandateId, agentId, lines, policy, opts.rationale ?? "");
+    return policy;
+  }
+
+  private logAttempt(mandateId: string, agentId: string, lines: CartLine[], policy: PolicyResult, rationale: string) {
+    this.log.push({ id: id("evt"), at: this.now().toISOString(), mandateId, agentId, decision: policy.decision, rule: policy.rule, reason: policy.reason, totalCents: policy.totalCents, items: lines.map((l) => `${l.quantity} × ${l.name}`).join(", "), rationale: rationale.slice(0, 500) });
   }
 
   /** Agent entry point. In-scope carts are charged to the saved wallet with the buyer absent. */
   async purchase(mandateId: string, agentId: string, lines: CartLine[], rationale: string): Promise<PurchaseOutcome> {
     const policy = this.check(mandateId, lines, agentId);
-    this.log.push({ at: this.now().toISOString(), mandateId, agentId, decision: policy.decision, rule: policy.rule, totalCents: policy.totalCents });
+    this.logAttempt(mandateId, agentId, lines, policy, rationale);
     if (policy.decision === "deny") return { decision: "deny", policy };
     if (policy.decision === "needs_approval") {
       const cm: CartMandate = { id: id("cart"), mandateId, agentId, lines, totalCents: policy.totalCents, rationale, policy, status: "pending", createdAt: this.now().toISOString() };
