@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PayPal core — sandbox harness</title>
+  <style>
+    :root { font-family: system-ui, sans-serif; color: #0b1f33; background: #f6f8fb; }
+    main { max-width: 720px; margin: 3rem auto; padding: 0 1rem; }
+    section { background: #fff; border: 1px solid #dde3ea; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
+    h1 { font-size: 1.4rem; } h2 { font-size: 1.05rem; margin-top: 0; }
+    button.plain { font: inherit; padding: .5rem .9rem; border-radius: 8px; border: 1px solid #b8c4d1; background: #fff; cursor: pointer; }
+    pre { background: #0b1f33; color: #e6eef7; padding: .75rem; border-radius: 8px; white-space: pre-wrap; font-size: .8rem; min-height: 3rem; }
+    paypal-button { --paypal-button-border-radius: 8px; display: block; max-width: 320px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>PayPal core — sandbox harness</h1>
+  <p>Exercises every server route with the PayPal v6 Web SDK. Sandbox only; demo catalog.</p>
+
+  <section>
+    <h2>1. One-time payment (clientId)</h2>
+    <p>Cart: 1 × coffee beans, 1 × filters. Amounts are priced on the server.</p>
+    <paypal-button id="pay-once" type="pay" hidden></paypal-button>
+  </section>
+
+  <section>
+    <h2>2. Save PayPal without purchase (clientToken)</h2>
+    <paypal-button id="save-wallet" type="pay" hidden></paypal-button>
+  </section>
+
+  <section>
+    <h2>3. Charge saved wallet (buyer not present)</h2>
+    <button class="plain" id="charge-saved" disabled>Charge $6.50 filters to saved wallet</button>
+    <button class="plain" id="refund-last" disabled>Refund last capture</button>
+  </section>
+
+  <section>
+    <h2>Log</h2>
+    <pre id="log"></pre>
+  </section>
+</main>
+<script>
+const log = (label, data) => { const el = document.getElementById("log"); el.textContent = `${new Date().toLocaleTimeString()} ${label} ${data ? JSON.stringify(data, null, 1) : ""}\n` + el.textContent; };
+const api = async (path, body) => {
+  const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body ?? {}) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { log(`ERROR ${path}`, j); throw Object.assign(new Error(j.message || path), j); }
+  return j;
+};
+let walletRef = sessionStorage.getItem("walletRef"), lastCapture = null;
+const enableSaved = () => { document.getElementById("charge-saved").disabled = !walletRef; };
+
+async function boot() {
+  const cfg = await (await fetch("/api/config")).json();
+  await new Promise((res, rej) => { const s = document.createElement("script"); s.src = cfg.sdkUrl; s.async = true; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
+
+  // One-time payment: clientId mode (no server token needed).
+  const sdk = await window.paypal.createInstance({ clientId: cfg.clientId, components: ["paypal-payments"], pageType: "checkout" });
+  const methods = await sdk.findEligibleMethods({ currencyCode: "USD" });
+  if (methods.isEligible("paypal")) {
+    const session = sdk.createPayPalOneTimePaymentSession({
+      onApprove: async ({ orderId }) => { const c = await api(`/api/orders/${orderId}/capture`); lastCapture = c.captureId; document.getElementById("refund-last").disabled = !lastCapture; log("captured", c); },
+      onCancel: () => log("buyer cancelled"),
+      onError: (e) => log("sdk error", { code: e.code, message: e.message }),
+    });
+    const btn = document.getElementById("pay-once"); btn.hidden = false;
+    btn.addEventListener("click", async () => {
+      try { await session.start({ presentationMode: "auto" }, api("/api/orders", { items: [{ sku: "COF-BEANS-1LB", quantity: 1 }, { sku: "COF-FILTERS-100", quantity: 1 }] }).then((o) => ({ orderId: o.id }))); }
+      catch (e) { log("start failed", { message: e.message }); }
+    });
+  }
+
+  // Vault without purchase: clientToken mode is required.
+  const { clientToken } = await api("/api/client-token");
+  const vsdk = await window.paypal.createInstance({ clientToken, components: ["paypal-payments"], pageType: "checkout" });
+  const vm = await vsdk.findEligibleMethods({ currencyCode: "USD", paymentFlow: "VAULT_WITHOUT_PAYMENT" });
+  if (vm.isEligible("paypal")) {
+    const save = vsdk.createPayPalSavePaymentSession({
+      onApprove: async ({ vaultSetupToken }) => { const w = await api("/api/vault/payment-token", { setupTokenId: vaultSetupToken }); walletRef = w.walletRef; sessionStorage.setItem("walletRef", walletRef); enableSaved(); log("wallet saved", w); },
+      onCancel: () => log("vault cancelled"),
+      onError: (e) => log("vault error", { message: String(e) }),
+    });
+    const vbtn = document.getElementById("save-wallet"); vbtn.hidden = false;
+    vbtn.addEventListener("click", async () => {
+      // Do not await before start(): keeps the click's transient activation for the popup.
+      const p = api("/api/vault/setup-token", { description: "Save PayPal for future purchases" }).then((t) => ({ vaultSetupToken: t.id }));
+      try { await save.start({ presentationMode: "auto" }, p); } catch (e) { log("vault start failed", { message: e.message }); }
+    });
+  }
+  enableSaved();
+  document.getElementById("charge-saved").onclick = async () => { const o = await api("/api/orders/vaulted", { walletRef, items: [{ sku: "COF-FILTERS-100", quantity: 1 }] }); lastCapture = o.captureId; document.getElementById("refund-last").disabled = !lastCapture; log("charged saved wallet", o); };
+  document.getElementById("refund-last").onclick = async () => log("refunded", await api("/api/refunds", { captureId: lastCapture, note: "Refund from sandbox harness" }));
+}
+boot().catch((e) => log("boot failed", { message: e.message }));
+</script>
+</body>
+</html>
