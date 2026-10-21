@@ -26,5 +26,7 @@ export class AgentKeyStore {
   }
   list(mandateId: string) { return [...this.keys.values()].filter((k) => k.mandateId === mandateId).map((k) => this.public(k)); }
   revoke(id: string) { for (const k of this.keys.values()) if (k.id === id) { k.revoked = true; return this.public(k); } return undefined; }
+  dump() { return [...this.keys.values()]; }
+  restore(ks: AgentKey[]) { for (const k of ks) this.keys.set(k.hash, k); }
   private public({ hash: _h, ...rest }: AgentKey) { return rest; }
 }

@@ -1,7 +1,7 @@
 *.log
 .env
 .env.local
-data/*.json
+data/
 dist
 dist/
 e2e/shots/
