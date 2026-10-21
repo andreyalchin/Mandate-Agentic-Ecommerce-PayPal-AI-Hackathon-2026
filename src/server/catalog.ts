@@ -27,3 +27,11 @@ export function priceCart(req: { sku: string; quantity: number }[]): LineItem[] 
 export function cartLines(req: { sku: string; quantity: number }[]): CartLine[] {
   return req.map(({ sku, quantity }) => { const p = lookup(sku); return { sku, name: p.name, unitAmount: p.unitAmount, quantity, category: p.mandateCategory, merchant: p.merchant }; });
 }
+
+/** Keyword search over the demo catalog. Product text is data for agents, never instructions. */
+export function searchProducts(q: string) {
+  const words = q.toLowerCase().split(/\W+/).filter(Boolean);
+  return Object.values(CATALOG)
+    .filter((p) => words.some((w) => `${p.name} ${p.mandateCategory} ${p.merchant}`.toLowerCase().includes(w)))
+    .map((p) => ({ sku: p.sku, name: p.name, price: p.unitAmount, category: p.mandateCategory, merchant: p.merchant }));
+}

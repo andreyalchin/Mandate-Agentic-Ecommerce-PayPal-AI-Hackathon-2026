@@ -9,12 +9,14 @@ import { priceCart } from "./catalog.js";
 import { WalletStore } from "./walletStore.js";
 import { MandateService } from "../mandate/service.js";
 import { mandateRoutes, type Llm } from "./mandateRoutes.js";
+import { mcpRoutes } from "../mcp/server.js";
+import { AgentKeyStore } from "../mcp/agentKeys.js";
 
-export interface Deps { cfg: PayPalConfig; pay: PayPalPayments; rest: PayPalRest; wallets?: WalletStore; mandates?: MandateService; llm?: Llm; onEvent?: (e: any) => void | Promise<void> }
+export interface Deps { cfg: PayPalConfig; pay: PayPalPayments; rest: PayPalRest; wallets?: WalletStore; mandates?: MandateService; agentKeys?: AgentKeyStore; llm?: Llm; onEvent?: (e: any) => void | Promise<void> }
 
 const Cart = z.object({ items: z.array(z.object({ sku: z.string().min(1), quantity: z.number().int().min(1).max(20) })).min(1) });
 
-export function createApp({ cfg, pay, rest, wallets = new WalletStore(), mandates, llm, onEvent }: Deps) {
+export function createApp({ cfg, pay, rest, wallets = new WalletStore(), mandates, agentKeys = new AgentKeyStore(), llm, onEvent }: Deps) {
   const svc = mandates ?? new MandateService(pay, wallets);
   const app = express();
   const inbox = new WebhookInbox();
@@ -40,6 +42,7 @@ export function createApp({ cfg, pay, rest, wallets = new WalletStore(), mandate
   app.use(express.static(path.resolve("public")));
 
   app.use(mandateRoutes(svc, cfg.publicOrigin, llm));
+  app.use(mcpRoutes(svc, agentKeys, cfg.publicOrigin));
 
   app.get("/api/health", (_req, res) => res.json({ ok: true, env: cfg.env }));
 

@@ -33,6 +33,36 @@ function MandateCard({ st, onRevoke }: { st: MandateState; onRevoke: () => void 
   );
 }
 
+function ConnectAgent({ mandateId, active }: { mandateId: string; active: boolean }) {
+  const [open, setOpen] = useState(false); const [name, setName] = useState("Claude Code");
+  const [issued, setIssued] = useState<{ key: string; mcpUrl: string; agentName: string } | null>(null);
+  const [keys, setKeys] = useState<{ id: string; agentName: string; lastUsedAt?: string; revoked?: boolean }[]>([]);
+  const [copied, setCopied] = useState<string | null>(null);
+  const load = useCallback(() => api(`/api/mandates/${mandateId}/agent-keys`).then(setKeys).catch(() => {}), [mandateId]);
+  useEffect(() => { load(); }, [load]);
+  const copy = (k: string, v: string) => { navigator.clipboard?.writeText(v).then(() => { setCopied(k); setTimeout(() => setCopied(null), 1500); }).catch(() => {}); };
+  const cmd = issued ? `claude mcp add --transport http mandate ${issued.mcpUrl} --header "Authorization: Bearer ${issued.key}"` : "";
+  return (
+    <section className="card connect" aria-labelledby="ch">
+      <div className="doc-head"><span className="eyebrow" id="ch">Outside agents</span><span className="muted sm">MCP</span></div>
+      <p className="sm muted">Give any MCP agent a key that can only spend through this mandate.</p>
+      {keys.filter((k) => !k.revoked).map((k) => <div key={k.id} className="keyrow"><span>{k.agentName}</span><span className="muted sm">{k.lastUsedAt ? `used ${timeOf(k.lastUsedAt)}` : "not used yet"}</span><button className="link" onClick={async () => { await api(`/api/agent-keys/${k.id}/revoke`, {}); load(); }}>Revoke</button></div>)}
+      {!open && !issued && <button className="btn sm" disabled={!active} onClick={() => setOpen(true)}>Connect an agent</button>}
+      {open && !issued && <form className="row" onSubmit={async (e) => { e.preventDefault(); const r = await api(`/api/mandates/${mandateId}/agent-keys`, { agentName: name }); setIssued(r); setOpen(false); load(); }}>
+        <label className="sr" htmlFor="an">Agent name</label><input id="an" className="field" value={name} onChange={(e) => setName(e.target.value)} maxLength={40} /><button className="btn primary sm">Create key</button></form>}
+      {issued && <div className="issued">
+        <p className="fine">Copy now. The key is shown once.</p>
+        <div className="copyrow"><code>{issued.mcpUrl}</code><button className="link" onClick={() => copy("url", issued.mcpUrl)}>{copied === "url" ? "Copied" : "Copy URL"}</button></div>
+        <div className="copyrow"><code>{issued.key.slice(0, 14)}…</code><button className="link" onClick={() => copy("key", issued.key)}>{copied === "key" ? "Copied" : "Copy key"}</button></div>
+        <div className="copyrow"><code>claude mcp add …</code><button className="link" onClick={() => copy("cmd", cmd)}>{copied === "cmd" ? "Copied" : "Copy command"}</button></div>
+        <button className="link" onClick={() => setIssued(null)}>Done</button>
+      </div>}
+    </section>
+  );
+}
+
+function agentLabel(id: string) { return id.startsWith("mcp:") ? id.slice(4) : id === "mandate-claude-agent" ? "Shopping agent" : id; }
+
 function Trace({ steps }: { steps: AgentStep[] }) {
   return <ol className="trace">{steps.map((s, i) => {
     if (s.tool === "search_products") return <li key={i}>{Icon.search()}<span>Searched “{s.input.query}” · {Array.isArray(s.result) ? s.result.length : 0} found</span></li>;
@@ -102,6 +132,7 @@ function ReceiptItem({ r, onUndo }: { r: Receipt; onUndo: () => Promise<void> })
     <article className={`item receipt ${refunded ? "refunded" : ""}`}>
       <div className="item-top"><span className={`badge ${refunded ? "muted" : "ok"}`}>{refunded ? <>{Icon.undo(14)} Refunded</> : <>{Icon.check(14)} Bought</>}</span><span className="amt">{money(r.totalCents)}</span></div>
       <p className="what">{r.lines.map((l) => `${l.quantity > 1 ? `${l.quantity} × ` : ""}${l.name}`).join(", ")} <span className="muted">· {r.lines[0]?.merchant}</span></p>
+      <p className="fine via">via {agentLabel(r.agentId)} · {timeOf(r.at)}</p>
       <p className="why"><b>Allowed by:</b> {allowed}</p>
       {r.rationale && <p className="quote">Agent: “{r.rationale}”</p>}
       <div className="item-foot"><code title="PayPal order ID">PayPal {r.orderId}</code>{!refunded && <button className="btn ghost sm" disabled={busy} onClick={async () => { setBusy(true); await onUndo(); setBusy(false); }}>{busy ? <Spinner /> : Icon.undo(14)} Undo</button>}</div>
@@ -115,7 +146,7 @@ function Blocked({ e }: { e: ActivityEvent }) {
       <div className="item-top"><span className="badge bad">{Icon.x(14)} Blocked</span><span className="amt muted">{money(e.totalCents)}</span></div>
       <p className="what">{e.items}</p>
       <p className="why"><b>Rule:</b> {e.reason}</p>
-      <p className="fine">No money moved · {timeOf(e.at)}</p>
+      <p className="fine">No money moved · via {agentLabel(e.agentId)} · {timeOf(e.at)}</p>
     </article>
   );
 }
@@ -144,6 +175,7 @@ export function Dashboard({ mandateId, onReset }: { mandateId: string; onReset: 
   return (
     <main className="dash">
       <div className="col-left">{st ? <MandateCard st={st} onRevoke={async () => { await api(`/api/mandates/${mandateId}/revoke`, {}); refresh(); }} /> : <section className="card"><Skeleton lines={6} /></section>}
+        {st && <ConnectAgent mandateId={mandateId} active={st.mandate.status === "active"} />}
         {st?.mandate.status === "revoked" && <button className="btn primary full" onClick={onReset}>Create a new mandate</button>}
       </div>
       <Agent mandateId={mandateId} active={st?.mandate.status !== "revoked"} onChange={refresh} notes={notes} />

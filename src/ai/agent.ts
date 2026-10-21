@@ -1,6 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { MandateService, PurchaseOutcome } from "../mandate/service.js";
-import { CATALOG, cartLines } from "../server/catalog.js";
+import { cartLines, searchProducts as search } from "../server/catalog.js";
 import { fmt } from "../mandate/money.js";
 import type { LlmClient } from "./claude.js";
 
@@ -13,12 +13,6 @@ const TOOLS: Anthropic.Tool[] = [
 export interface AgentStep { tool: string; input: unknown; result: unknown }
 export interface AgentRun { reply: string; steps: AgentStep[]; outcomes: PurchaseOutcome[] }
 
-function search(q: string) {
-  const words = q.toLowerCase().split(/\W+/).filter(Boolean);
-  return Object.values(CATALOG)
-    .filter((p) => words.some((w) => `${p.name} ${p.mandateCategory} ${p.merchant}`.toLowerCase().includes(w)))
-    .map((p) => ({ sku: p.sku, name: p.name, price: p.unitAmount, category: p.mandateCategory, merchant: p.merchant }));
-}
 
 /**
  * Shopping agent. It can only reach money through `purchase`, which goes through the
