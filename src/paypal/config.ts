@@ -23,7 +23,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PayPalConfig {
     clientSecret,
     env: mode,
     webhookId: env.PAYPAL_WEBHOOK_ID?.trim() || undefined,
-    publicOrigin: env.PUBLIC_ORIGIN ?? `http://localhost:${env.PORT ?? 8787}`,
+    publicOrigin: env.PUBLIC_ORIGIN ?? env.RENDER_EXTERNAL_URL ?? `http://localhost:${env.PORT ?? 8787}`,
   };
 }
 

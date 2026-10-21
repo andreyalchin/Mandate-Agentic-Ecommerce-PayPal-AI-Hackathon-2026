@@ -1,0 +1,35 @@
+# One-click deploy: Render dashboard → New → Blueprint → pick this repo.
+# Secrets marked sync: false are entered in the dashboard once; they never live in git.
+services:
+  - type: web
+    name: mandate
+    runtime: node
+    plan: starter            # always on (free instances sleep and lose disk state)
+    region: oregon
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/config
+    autoDeploy: true
+    disk:
+      name: mandate-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: PAYPAL_ENV
+        value: sandbox
+      - key: DATA_DIR
+        value: /var/data
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_WEBHOOK_ID     # add after creating the webhook (see README)
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: CHANNEL3_API_KEY
+        sync: false
+      - key: AG_STUDIO_LICENSE     # optional; console shows a watermark without it
+        sync: false
