@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { api, USER_ID, type Mandate, type Wallet } from "./api";
 import { Dashboard } from "./Dashboard";
 import { Setup } from "./Setup";
-import { Icon, Pill, Skeleton, Wordmark } from "./ui";
+import { Icon, Skeleton, Wordmark } from "./ui";
 
 // AG Studio is large, so the console loads only when opened.
 const ConsolePage = lazy(() => import("./console/ConsolePage"));
@@ -27,11 +27,11 @@ export function App() {
     <div className="app">
       <header className="top">
         <div className="row nav-left"><Wordmark />
-          <nav className="tabs" aria-label="Sections"><a href="#/" className={!onConsole ? "on" : ""}>Agent</a><a href="#/console" className={onConsole ? "on" : ""}>Spend console</a></nav>
+          <nav className="tabs" aria-label="Sections"><a href="#/" className={!onConsole ? "on" : ""}>Agent</a><a href="#/console" className={onConsole ? "on" : ""}>Console</a></nav>
         </div>
-        <div className="row">
-          <Pill tone="neutral">Sandbox</Pill>
-          {wallet && <Pill tone="ink">{Icon.check(12)} PayPal linked</Pill>}
+        <div className="row top-right">
+          <span className="pill sandbox">Sandbox</span>
+          {wallet && <span className="pill ink" title="PayPal linked">{Icon.check(12)} PayPal</span>}
         </div>
       </header>
       {onConsole ? <Suspense fallback={<main className="setup"><section className="card"><Skeleton lines={5} /></section></main>}><ConsolePage licenseKey={license} /></Suspense>

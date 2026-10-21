@@ -40,15 +40,18 @@ function MandateMeter(props: any) {
     <div className="mw-meter" role="list">
       {rows.map((r, i) => {
         const name = String(pick(r, mf, 0) ?? ""); const spent = Number(pick(r, sf, 1) ?? 0); const budget = Number(pick(r, bf, 2) ?? 0); const ask = Number(pick(r, af, 3) ?? 0);
-        const pct = budget ? Math.min(100, (spent / budget) * 100) : 0; const over = budget && spent > budget;
+        const pct = budget ? Math.min(100, (spent / budget) * 100) : 0; const over = budget > 0 && spent > budget;
         return (
-          <div key={i} className="mw-row" role="listitem">
-            <div className="mw-top"><span className="mw-name" title={name}>{name}</span><span className={`mw-num ${over ? "over" : ""}`}>{money(spent)} <span>of {money(budget)}</span></span></div>
+          <div key={i} className="mw-row" role="listitem" title={name}>
+            <div className="mw-top">
+              <span className="mw-name">{name}</span>
+              <span className={`mw-num ${over ? "over" : ""}`}>{money(spent)}<span> / {money(budget)}</span></span>
+            </div>
             <div className="mw-bar"><span className={over ? "over" : pct > 85 ? "hot" : ""} style={{ width: `${pct}%` }} />{ask > 0 && budget > 0 && <i title={`Ask above ${money(ask)}`} style={{ left: `${Math.min(100, (ask / budget) * 100)}%` }} />}</div>
-            {ask > 0 && <div className="mw-fine">Single purchases above {money(ask)} need a tap{over ? " · over budget by approval" : ""}</div>}
           </div>
         );
       })}
+      <div className="mw-legend"><i /> Ask-above threshold</div>
     </div>
   );
 }
@@ -66,16 +69,20 @@ function DecisionFlow(props: any) {
   if (!rows) return null;
   const [of, vf] = f(dm);
   const by = new Map<string, number>(); for (const r of rows) by.set(String(pick(r, of, 0)), Number(pick(r, vf, 1) ?? 0));
-  const total = [...by.values()].reduce((a, b) => a + b, 0) || 1;
+  const total = [...by.values()].reduce((a, b) => a + b, 0);
+  const groups = GROUPS.map((g) => ({ ...g, n: g.outcomes.reduce((a, o) => a + (by.get(o) ?? 0), 0) }));
+  const pct = (n: number) => (total ? Math.round((n / total) * 100) : 0);
   return (
     <div className="mw-flow">
-      <div className="mw-total"><b>{[...by.values()].reduce((a, b) => a + b, 0).toLocaleString()}</b><span>agent attempts</span></div>
+      <div className="mw-flow-head"><b className="num">{total.toLocaleString()}</b><span>agent attempts</span></div>
+      <div className="mw-stack" aria-hidden>{groups.map((g) => g.n > 0 && <span key={g.key} className={g.tone} style={{ flexGrow: g.n }} />)}</div>
       <div className="mw-groups">
-        {GROUPS.map((g) => { const n = g.outcomes.reduce((a, o) => a + (by.get(o) ?? 0), 0); return (
-          <div key={g.key} className={`mw-group ${g.tone}`} style={{ flexGrow: Math.max(n, total * 0.12) }}>
-            <div className="mw-ghead"><span>{g.label}</span><b title={`${Math.round((n / total) * 100)}% of attempts`}>{n.toLocaleString()}</b></div>
-            <ul>{g.outcomes.filter((o) => (by.get(o) ?? 0) > 0).map((o) => <li key={o}><span>{o}</span><b>{(by.get(o) ?? 0).toLocaleString()}</b></li>)}</ul>
-          </div>); })}
+        {groups.map((g) => (
+          <div key={g.key} className={`mw-group ${g.tone}`}>
+            <div className="mw-glabel"><i />{g.label}</div>
+            <div className="mw-gnum"><b className="num">{g.n.toLocaleString()}</b><span className="num">{pct(g.n)}%</span></div>
+            <ul>{g.outcomes.filter((o) => (by.get(o) ?? 0) > 0 && o !== g.label).map((o) => <li key={o}><span>{o.replace(" by you", "")}</span><b className="num">{(by.get(o) ?? 0).toLocaleString()}</b></li>)}</ul>
+          </div>))}
       </div>
     </div>
   );

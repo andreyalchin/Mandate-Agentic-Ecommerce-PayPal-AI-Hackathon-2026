@@ -10,15 +10,14 @@ const typo = (fontSize: number, fontWeight: "normal" | "bold" = "normal") => ({ 
 const kpi = (text: string, value: any, sparklineX?: string) => ({
   type: "value" as const,
   dataMapping: { value: [value], ...(sparklineX && { sparklineX: [{ id: sparklineX }] }) },
-  format: { title: { enabled: true, text, typography: typo(13, "bold") }, caption: { enabled: true, text: "", typography: typo(0) }, style: { typography: typo(24) } },
+  format: { title: { enabled: true, text, typography: typo(12) }, caption: { enabled: false }, style: { typography: typo(26, "bold") } },
 });
 const legend = { style: { theme: { common: { legend: { enabled: true } } } } };
 
 const overview: AgPageState = {
   id: "overview",
   widgets: {
-    source: { type: "button-filter", dataMapping: { value: [{ id: "attempts.source" }] }, format: { title: { enabled: false }, style: { selection: { type: "single" }, dimensions: { height: 30, minWidth: 84 } } } } as any,
-    period: { type: "date-filter", dataMapping: { value: [{ id: "attempts.day" }] }, format: { style: { filterType: "between" } } } as any,
+    source: { type: "button-filter", dataMapping: { value: [{ id: "attempts.source" }] }, format: { title: { enabled: false }, style: { selection: { type: "single" }, dimensions: { height: 30, minWidth: 92 } } } } as any,
     "kpi-spent": kpi("Spent by agents", sum("attempts.spent"), "calendar::week"),
     "kpi-attempts": kpi("Attempts", sum("attempts.attempts"), "calendar::week"),
     "kpi-blocked": kpi("Blocked value", sum("attempts.blockedAmount"), "calendar::week"),
@@ -29,17 +28,17 @@ const overview: AgPageState = {
     rules: { type: "bar-chart-grouped", dataMapping: { categoryKey: [{ id: "attempts.rule" }], valueKey: [sum("attempts.attempts")] }, format: title("Which rule decided") } as any,
     ledger: {
       type: "grid",
-      dataMapping: { cols: [{ id: "attempts.day" }, { id: "attempts.source" }, { id: "attempts.agent" }, { id: "attempts.item" }, { id: "attempts.outcome" }, { id: "attempts.rule" }, sum("attempts.amount"), sum("attempts.spent"), { id: "attempts.paypalOrderId" }] },
+      dataMapping: { cols: [{ id: "attempts.day" }, { id: "attempts.item" }, { id: "attempts.outcome" }, { id: "attempts.rule" }, sum("attempts.amount"), { id: "attempts.source" }] },
       sort: [{ field: { id: "attempts.day" }, direction: "desc" }],
       format: title("Every attempt, newest first"),
     } as any,
   },
   widgetLayout: {
-    source: at(0, 0, 8, 5), period: at(8, 0, 16, 5),
-    "kpi-spent": at(0, 5, 6, 7), "kpi-attempts": at(6, 5, 6, 7), "kpi-blocked": at(12, 5, 6, 7), "kpi-blockrate": at(18, 5, 6, 7),
-    meters: at(0, 12, 12, 14), flow: at(12, 12, 12, 14),
-    weekly: at(0, 26, 14, 20), rules: at(14, 26, 10, 20),
-    ledger: at(0, 46, 24, 24),
+    source: at(0, 0, 8, 3),
+    "kpi-spent": at(0, 3, 6, 7), "kpi-attempts": at(6, 3, 6, 7), "kpi-blocked": at(12, 3, 6, 7), "kpi-blockrate": at(18, 3, 6, 7),
+    meters: at(0, 10, 12, 12), flow: at(12, 10, 12, 12),
+    weekly: at(0, 22, 14, 22), rules: at(14, 22, 10, 22),
+    ledger: at(0, 44, 24, 26),
   },
 };
 
@@ -61,4 +60,24 @@ const agents: AgPageState = {
 };
 
 export const pageTitles: Record<string, string> = { overview: "Overview", agents: "Agents" };
-export const consoleReport: AgReportState = { selectedPageId: overview.id, pages: [overview, agents], panels: { filters: { collapsed: true }, data: { collapsed: true } } } as any;
+
+/** Phones: AG Studio's canvas has no responsive mode, so stack every widget full width. */
+const stack = (page: AgPageState, order: string[], heights: Record<string, number>, kpiPairs = true): AgPageState => {
+  const widgetLayout: Record<string, AgWidgetLayoutState> = {}; let y = 0; let half = 0;
+  for (const id of order) {
+    const h = heights[id] ?? 18;
+    if (kpiPairs && id.startsWith("kpi-")) { widgetLayout[id] = at(half ? 12 : 0, y, 12, h); if (half) y += h; half = half ? 0 : 1; continue; }
+    if (half) { y += heights["kpi-spent"] ?? 6; half = 0; }
+    widgetLayout[id] = at(0, y, 24, h); y += h;
+  }
+  return { ...page, widgetLayout };
+};
+const mobileOverview = stack(overview, ["source", "kpi-spent", "kpi-attempts", "kpi-blocked", "kpi-blockrate", "meters", "flow", "weekly", "rules", "ledger"],
+  { source: 3, "kpi-spent": 6, "kpi-attempts": 6, "kpi-blocked": 6, "kpi-blockrate": 6, meters: 11, flow: 17, weekly: 22, rules: 18, ledger: 26 });
+const mobileAgents = stack(agents, ["by-agent", "spend-tree", "category-sunburst", "blocked"], { "by-agent": 18, "spend-tree": 18, "category-sunburst": 20, blocked: 24 });
+
+/** Canvas height in rows for a page, so the phone page can scroll naturally instead of inside a box. */
+export const pageRows = (p: AgPageState) => Math.max(...Object.values(p.widgetLayout ?? {}).map((l: any) => l.yTrack + l.ySpan));
+const base = { panels: { filters: { collapsed: true }, data: { collapsed: true } } };
+export const consoleReport: AgReportState = { selectedPageId: overview.id, pages: [overview, agents], ...base } as any;
+export const mobileReport: AgReportState = { selectedPageId: overview.id, pages: [mobileOverview, mobileAgents], ...base } as any;

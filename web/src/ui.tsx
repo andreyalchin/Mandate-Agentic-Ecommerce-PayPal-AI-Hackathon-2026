@@ -15,11 +15,24 @@ export const Icon = {
   cart: (s = 14) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden {...P}><path d="M3 4h2.5l2.2 11h10.6l2-8H6.6" /><circle cx="9.5" cy="19.5" r="1.3" /><circle cx="17" cy="19.5" r="1.3" /></svg>,
   send: (s = 18) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden {...P}><path d="M5 12h13M13 6l6 6-6 6" /></svg>,
   spark: (s = 14) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden {...P}><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6.3 6.3l2.5 2.5M15.2 15.2l2.5 2.5M6.3 17.7l2.5-2.5M15.2 8.8l2.5-2.5" /></svg>,
+  mic: (s = 18) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden {...P}><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5.5 11a6.5 6.5 0 0013 0M12 17.5V21" /></svg>,
+  stop: (s = 16) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden><rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor" /></svg>,
+  chevron: (s = 16) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden {...P}><path d="M6 9l6 6 6-6" /></svg>,
+  arrowUp: (s = 18) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden {...P}><path d="M12 19V5M6 11l6-6 6 6" /></svg>,
+  external: (s = 14) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden {...P}><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5" /></svg>,
+  bot: (s = 18) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden {...P}><rect x="4" y="8" width="16" height="11" rx="3.5" /><path d="M12 4v4M9 13h.01M15 13h.01" strokeWidth="2.4" /></svg>,
+  plug: (s = 16) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden {...P}><path d="M9 3v5M15 3v5M6.5 8h11v3a5.5 5.5 0 01-11 0V8zM12 16.5V21" /></svg>,
   key: (s = 14) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden {...P}><circle cx="8" cy="15" r="4" /><path d="M11 12l8-8M16 7l2 2M14 9l2 2" /></svg>,
 };
 
 export function Wordmark() {
-  return <span className="wordmark"><svg width="22" height="22" viewBox="0 0 32 32" aria-hidden><rect width="32" height="32" rx="8" fill="currentColor" /><path d="M9 22V10l7 7 7-7v12" stroke="var(--paper)" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>Mandate</span>;
+  return <span className="wordmark"><svg width="22" height="22" viewBox="0 0 32 32" aria-hidden><rect width="32" height="32" rx="8" fill="currentColor" /><path d="M9 22V10l7 7 7-7v12" stroke="var(--paper)" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg><span className="wm-text">Mandate</span></span>;
+}
+
+/** Mic toggle for voice input. Hidden when the browser has no speech recognition. */
+export function MicButton({ listening, supported, onClick, disabled, className = "" }: { listening: boolean; supported: boolean; onClick: () => void; disabled?: boolean; className?: string }) {
+  if (!supported) return null;
+  return <button type="button" className={`mic ${listening ? "on" : ""} ${className}`} onClick={onClick} disabled={disabled} aria-pressed={listening} aria-label={listening ? "Stop voice input" : "Speak instead of typing"} title={listening ? "Stop" : "Speak"}>{listening ? Icon.stop(14) : Icon.mic(18)}</button>;
 }
 
 export function Spinner() { return <span className="spinner" aria-hidden />; }

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api, amt, CATEGORIES, dateOf, per, USER_ID, type Category, type Mandate, type MandateInput, type Wallet } from "./api";
-import { Icon, PayPalButton, Spinner } from "./ui";
+import { Icon, MicButton, PayPalButton, Spinner } from "./ui";
+import { useSpeech } from "./speech";
 
 const EXAMPLES = [
   "Keep me stocked on coffee beans, filters and brewing gear. No more than $60 a month, and check with me on anything over $25.",
@@ -20,6 +21,7 @@ export function Setup({ wallet, onWallet, onSigned }: { wallet: Wallet | null; o
   const [busy, setBusy] = useState<"draft" | "sign" | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const step = !wallet ? 0 : !draft ? 1 : 2;
+  const speech = useSpeech({ onInterim: setText, onFinal: setText, onError: setErr });
 
   async function makeDraft() {
     setBusy("draft"); setErr(null);
@@ -48,7 +50,7 @@ export function Setup({ wallet, onWallet, onSigned }: { wallet: Wallet | null; o
           <h2 id="s1">Link PayPal once</h2>
           <p>PayPal saves your account so your agent can pay within your mandate while you're away. PayPal will show a $1.00 authorization; it's voided right away, so nothing is charged. You can unlink anytime.</p>
           <PayPalButton kind="vault" onDone={(w: any) => onWallet({ walletRef: w.walletRef, label: w.label, createdAt: new Date().toISOString() })} onError={setErr} />
-          <p className="fine">Sandbox: sign in with the test buyer account from the README. No real money moves.</p>
+          <p className="fine">Sandbox only: sign in with the test buyer from the README. No real money moves.</p>
         </section>
       )}
 
@@ -56,9 +58,13 @@ export function Setup({ wallet, onWallet, onSigned }: { wallet: Wallet | null; o
         <section className="card step-card" aria-labelledby="s2">
           <div className="linked">{Icon.check(14)} PayPal linked</div>
           <h2 id="s2">What may your agent buy?</h2>
-          <p>Say it the way you'd tell a person. Include a budget and when it should check with you.</p>
+          <p>Say it the way you'd tell a person: a budget, and when it should check with you.</p>
           <label className="sr" htmlFor="intent">Instructions for your agent</label>
-          <textarea id="intent" rows={4} value={text} onChange={(e) => setText(e.target.value)} placeholder={EXAMPLES[0]} />
+          <div className="speak-box">
+            <textarea id="intent" rows={4} value={text} onChange={(e) => setText(e.target.value)} placeholder={speech.listening ? "Listening…" : EXAMPLES[0]} />
+            <MicButton supported={speech.supported} listening={speech.listening} onClick={speech.toggle} />
+          </div>
+          {speech.supported && <p className="fine speak-hint">{Icon.mic(13)} Tap the mic and say it out loud. Your browser transcribes it.</p>}
           <div className="chips" aria-label="Examples">{EXAMPLES.map((e, i) => <button key={i} className="chip" onClick={() => setText(e)}>{e.split(".")[0]}</button>)}</div>
           <div className="row end"><button className="btn primary" disabled={text.trim().length < 8 || !!busy} onClick={makeDraft}>{busy === "draft" ? <><Spinner /> Drafting…</> : <>Draft my mandate</>}</button></div>
         </section>
