@@ -78,7 +78,7 @@ export function createApp({ cfg, pay, rest, wallets = new WalletStore(), mandate
     try {
       const { items } = Cart.parse(req.body);
       const order = await pay.createOrder(buildOrderRequest(priceCart(items), "USD", {
-        brandName: "Hackathon Demo", storeInVault: req.body?.saveForLater === true,
+        brandName: "Mandate", storeInVault: req.body?.saveForLater === true,
         returnUrl: `${cfg.publicOrigin}/?return=1`, cancelUrl: `${cfg.publicOrigin}/?cancel=1`,
       }), req.get("x-idempotency-key") ?? undefined, mockOf(req));
       res.status(201).json({ id: order.id, status: order.status });
@@ -102,7 +102,7 @@ export function createApp({ cfg, pay, rest, wallets = new WalletStore(), mandate
     try {
       const st = await pay.createPayPalSetupToken({
         description: String(req.body?.description ?? "Save PayPal for future purchases").slice(0, 127),
-        returnUrl: `${cfg.publicOrigin}/?vault=return`, cancelUrl: `${cfg.publicOrigin}/?vault=cancel`, brandName: "Hackathon Demo",
+        returnUrl: `${cfg.publicOrigin}/?vault=return`, cancelUrl: `${cfg.publicOrigin}/?vault=cancel`, brandName: "Mandate",
       });
       res.status(201).json({ id: st.id, status: st.status });
     } catch (e) { next(e); }
