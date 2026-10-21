@@ -29,9 +29,10 @@ export function mandateRoutes(svc: MandateService, publicOrigin: string, llm?: L
   });
   r.get("/.well-known/mandate-keys", (_q, s) => s.json({ keys: [{ ...svc.signer.publicJwk(), use: "sig", alg: "EdDSA" }] }));
   r.post("/api/mandates", (q, s) => s.status(201).json(svc.create(q.body)));
-  r.get("/api/mandates", (q, s) => s.json([...svc.mandates.values()].filter((m) => !q.query.userId || m.userId === q.query.userId).reverse()));
+  r.get("/api/mandates", (q, s) => s.json([...svc.mandates.values()].filter((m) => m.userId === q.owner).reverse()));
+  const owned = (q: any, mandateId: string) => svc.mandates.get(mandateId)?.userId === q.owner;
   r.get("/api/mandates/:id/state", (q, s) => s.json(svc.state(q.params.id)));
-  r.get("/api/cart-mandates", (q, s) => s.json([...svc.carts.values()].filter((c) => (!q.query.mandateId || c.mandateId === q.query.mandateId) && (!q.query.status || c.status === q.query.status)).reverse()));
+  r.get("/api/cart-mandates", (q, s) => s.json([...svc.carts.values()].filter((c) => owned(q, c.mandateId) && (!q.query.mandateId || c.mandateId === q.query.mandateId) && (!q.query.status || c.status === q.query.status)).reverse()));
   // Same search the agents use (demo shops + Channel3 live products).
   r.get("/api/products/search", async (q, s, next) => { try { s.json(await findProducts(z.string().min(2).max(120).parse(q.query.q))); } catch (e) { next(e); } });
   r.get("/api/products", (_q, s) => s.json(Object.values(CATALOG).map((p) => ({ sku: p.sku, name: p.name, price: p.unitAmount, category: p.mandateCategory, merchant: p.merchant }))));
@@ -53,8 +54,8 @@ export function mandateRoutes(svc: MandateService, publicOrigin: string, llm?: L
   });
   r.post("/api/cart-mandates/:id/capture", async (q, s, next) => { try { s.status(201).json(await svc.captureApproval(q.params.id)); } catch (e) { next(e); } });
   r.post("/api/cart-mandates/:id/decline", (q, s) => s.json(svc.decline(q.params.id) ?? { error: "NOT_FOUND" }));
-  r.get("/api/receipts", (q, s) => s.json([...svc.receipts.values()].filter((x) => !q.query.mandateId || x.mandateId === q.query.mandateId).reverse()));
+  r.get("/api/receipts", (q, s) => s.json([...svc.receipts.values()].filter((x) => owned(q, x.mandateId) && !q.query.mandateId || x.mandateId === q.query.mandateId).reverse()));
   r.post("/api/receipts/:id/undo", async (q, s, next) => { try { s.json(await svc.undo(q.params.id)); } catch (e) { next(e); } });
-  r.get("/api/activity", (q, s) => s.json(svc.log.filter((e) => !q.query.mandateId || e.mandateId === q.query.mandateId).slice(-200).reverse()));
+  r.get("/api/activity", (q, s) => s.json(svc.log.filter((e) => owned(q, e.mandateId) && !q.query.mandateId || e.mandateId === q.query.mandateId).slice(-200).reverse()));
   return r;
 }

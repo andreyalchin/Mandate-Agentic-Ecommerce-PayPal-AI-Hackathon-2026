@@ -12,14 +12,17 @@ import { MandateService } from "../mandate/service.js";
 import { mandateRoutes, type Llm } from "./mandateRoutes.js";
 import { mcpRoutes } from "../mcp/server.js";
 import { keyKind } from "../ai/claude.js";
+import { cookieOwner, ownership, type OwnerOf } from "./session.js";
 import { consoleRoutes } from "../console/studioLlm.js";
 import { AgentKeyStore } from "../mcp/agentKeys.js";
 
-export interface Deps { cfg: PayPalConfig; pay: PayPalPayments; rest: PayPalRest; wallets?: WalletStore; mandates?: MandateService; agentKeys?: AgentKeyStore; llm?: Llm; onEvent?: (e: any) => void | Promise<void> }
+export interface Deps { cfg: PayPalConfig; pay: PayPalPayments; rest: PayPalRest; wallets?: WalletStore; mandates?: MandateService; agentKeys?: AgentKeyStore; llm?: Llm; onEvent?: (e: any) => void | Promise<void>;
+  /** Who is calling (default: anonymous session cookie). Tests pass a fixed owner. */ ownerOf?: OwnerOf;
+  /** Raw order/refund routes for the developer harness. Off in production unless ENABLE_HARNESS=1. */ harness?: boolean }
 
 const Cart = z.object({ items: z.array(z.object({ sku: z.string().min(1), quantity: z.number().int().min(1).max(20) })).min(1) });
 
-export function createApp({ cfg, pay, rest, wallets = new WalletStore(), mandates, agentKeys = new AgentKeyStore(), llm, onEvent }: Deps) {
+export function createApp({ cfg, pay, rest, wallets = new WalletStore(), mandates, agentKeys = new AgentKeyStore(), llm, onEvent, ownerOf, harness = process.env.ENABLE_HARNESS === "1" || !!process.env.VITEST }: Deps) {
   const svc = mandates ?? new MandateService(pay, wallets);
   const app = express();
   const inbox = new WebhookInbox();
@@ -45,7 +48,9 @@ export function createApp({ cfg, pay, rest, wallets = new WalletStore(), mandate
   // Product UI (Vite build) first, then the developer harness at /harness.html.
   app.use(compression());
   app.use(express.static(path.resolve("dist/web"), { maxAge: "1h" }));
-  app.use(express.static(path.resolve("public")));
+  if (harness) app.use(express.static(path.resolve("public")));
+  else app.use(["/api/orders", "/api/refunds"], (_q, s) => { s.status(404).json({ error: "NOT_FOUND" }); });
+  app.use(ownership(ownerOf ?? cookieOwner(cfg.publicOrigin.startsWith("https://")), svc, wallets, agentKeys));
 
   app.use(mandateRoutes(svc, cfg.publicOrigin, llm));
   app.use(mcpRoutes(svc, agentKeys, cfg.publicOrigin));
@@ -53,8 +58,8 @@ export function createApp({ cfg, pay, rest, wallets = new WalletStore(), mandate
 
   app.get("/api/health", (_req, res) => res.json({ ok: true, env: cfg.env }));
 
-  app.get("/api/wallets", (_req, res) => res.json(wallets.list()));
-  app.get("/api/config", (_req, res) => res.json({ env: cfg.env, sdkUrl: webSdkUrl(cfg.env), clientId: cfg.clientId.startsWith("proxy") ? undefined : cfg.clientId, agStudioLicense: process.env.AG_STUDIO_LICENSE || undefined, ai: keyKind(process.env.ANTHROPIC_API_KEY), webhook: !!cfg.webhookId }));
+  app.get("/api/wallets", (req, res) => res.json(wallets.list(req.owner)));
+  app.get("/api/config", (_req, res) => res.json({ env: cfg.env, sdkUrl: webSdkUrl(cfg.env), clientId: cfg.clientId.startsWith("proxy") ? undefined : cfg.clientId, agStudioLicense: process.env.AG_STUDIO_LICENSE || undefined, ai: keyKind(process.env.ANTHROPIC_API_KEY), webhook: !!cfg.webhookId, harness }));
 
   app.post("/api/client-token", async (_req, res, next) => {
     try {
@@ -104,7 +109,7 @@ export function createApp({ cfg, pay, rest, wallets = new WalletStore(), mandate
       const { setupTokenId } = z.object({ setupTokenId: z.string().min(1) }).parse(req.body);
       const pt = await pay.createPaymentTokenFromSetupToken(setupTokenId);
       if (!pt.id) throw new Error("PayPal returned no payment token id");
-      const w = wallets.save(pt.id, pt.customer?.id, "PayPal");
+      const w = wallets.save(pt.id, pt.customer?.id, "PayPal", req.owner);
       res.status(201).json({ walletRef: w.walletRef, label: w.label }); // vault id stays server-side
     } catch (e) { next(e); }
   });

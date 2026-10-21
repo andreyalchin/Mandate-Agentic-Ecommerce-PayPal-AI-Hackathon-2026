@@ -9,9 +9,9 @@ import { MandateService } from "../src/mandate/service.js";
 import { AgentKeyStore } from "../src/mcp/agentKeys.js";
 import { cfg, fakePay } from "./helpers.js";
 
-const pay = fakePay(); const wallets = new WalletStore(); const w = wallets.save("VAULT-1");
+const pay = fakePay(); const wallets = new WalletStore(); const w = wallets.save("VAULT-1", undefined, "PayPal", "u1");
 const svc = new MandateService(pay, wallets); const keys = new AgentKeyStore();
-const app = createApp({ cfg, pay, rest: new PayPalRest(cfg, (async () => new Response("{}")) as any), wallets, mandates: svc, agentKeys: keys });
+const app = createApp({ ownerOf: () => "u1", cfg, pay, rest: new PayPalRest(cfg, (async () => new Response("{}")) as any), wallets, mandates: svc, agentKeys: keys });
 let server: Server; let base = "";
 const m = svc.create({ userId: "u1", walletRef: w.walletRef, summary: "Coffee under $60/month, ask above $25", budget: { amount: "60.00", period: "month" }, approvalAbove: "25.00", categories: ["coffee"], expiresAt: "2027-01-01T00:00:00Z" });
 

@@ -24,6 +24,7 @@ export class AgentKeyStore {
     rec.lastUsedAt = new Date().toISOString();
     return rec;
   }
+  get(id: string) { for (const k of this.keys.values()) if (k.id === id) return k; return undefined; }
   list(mandateId: string) { return [...this.keys.values()].filter((k) => k.mandateId === mandateId).map((k) => this.public(k)); }
   revoke(id: string) { for (const k of this.keys.values()) if (k.id === id) { k.revoked = true; return this.public(k); } return undefined; }
   dump() { return [...this.keys.values()]; }

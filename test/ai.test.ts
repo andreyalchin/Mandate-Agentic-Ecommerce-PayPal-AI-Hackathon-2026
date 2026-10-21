@@ -15,9 +15,9 @@ const toolUse = (name: string, input: unknown, id = name) => ({ stop_reason: "to
 const text = (t: string) => ({ stop_reason: "end_turn", content: [{ type: "text", text: t }] });
 
 function setup(llm: ReturnType<typeof fakeLlm>) {
-  const pay = fakePay(); const wallets = new WalletStore(); const w = wallets.save("VAULT-1");
+  const pay = fakePay(); const wallets = new WalletStore(); const w = wallets.save("VAULT-1", undefined, "PayPal", "u1");
   const svc = new MandateService(pay, wallets);
-  const app = createApp({ cfg, pay, rest: new PayPalRest(cfg, (async () => new Response("{}")) as any), wallets, mandates: svc, llm });
+  const app = createApp({ ownerOf: () => "u1", cfg, pay, rest: new PayPalRest(cfg, (async () => new Response("{}")) as any), wallets, mandates: svc, llm });
   const m = svc.create({ userId: "u1", walletRef: w.walletRef, summary: "Coffee under $60/month, ask above $25", budget: { amount: "60.00", period: "month" }, approvalAbove: "25.00", categories: ["coffee"], expiresAt: "2027-01-01T00:00:00Z" });
   return { app, pay, svc, m, walletRef: w.walletRef };
 }
@@ -76,8 +76,10 @@ describe("shopping agent", () => {
     expect(svc.log.at(-1)).toMatchObject({ decision: "deny", rule: "category", items: "1 × Wireless headphones" });
   });
   it("returns 503 when AI is not configured", async () => {
-    const pay = fakePay(); const wallets = new WalletStore();
-    const app = createApp({ cfg, pay, rest: new PayPalRest(cfg, (async () => new Response("{}")) as any), wallets });
-    expect((await request(app).post("/api/agent/chat").send({ mandateId: "x", message: "hi" })).status).toBe(503);
+    const pay = fakePay(); const wallets = new WalletStore(); const w = wallets.save("V", undefined, "PayPal", "u1");
+    const mandates = new MandateService(pay, wallets);
+    const m = mandates.create({ userId: "u1", walletRef: w.walletRef, summary: "Coffee", budget: { amount: "60.00", period: "month" }, approvalAbove: "25.00", categories: ["coffee"], expiresAt: "2027-01-01T00:00:00Z" });
+    const app = createApp({ ownerOf: () => "u1", cfg, pay, rest: new PayPalRest(cfg, (async () => new Response("{}")) as any), wallets, mandates });
+    expect((await request(app).post("/api/agent/chat").send({ mandateId: m.id, message: "hi" })).status).toBe(503);
   });
 });

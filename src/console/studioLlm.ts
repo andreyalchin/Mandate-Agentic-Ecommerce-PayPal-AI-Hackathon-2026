@@ -78,7 +78,8 @@ function limiter(perMinute: number) {
 export function consoleRoutes(svc: MandateService, llm?: Llm) {
   const r = Router(); const allow = limiter(40);
   r.get("/api/console/data", (q, s) => {
-    const live = liveRows(svc); const sim = q.query.simulated === "0" ? { attempts: [], mandates: [] } : simulatedRows();
+    const all = liveRows(svc); const mine = new Set([...svc.mandates.values()].filter((m) => m.userId === q.owner).map((m) => m.id));
+    const live = { attempts: all.attempts.filter((a) => mine.has(a.mandateId)), mandates: all.mandates.filter((m) => mine.has(m.id)) }; const sim = q.query.simulated === "0" ? { attempts: [], mandates: [] } : simulatedRows();
     s.json({ asOf: new Date().toISOString(), attempts: [...sim.attempts, ...live.attempts].sort((a, b) => a.at.localeCompare(b.at)), mandates: [...sim.mandates, ...live.mandates] });
   });
   r.post("/api/studio/turn", async (q, s, next) => {

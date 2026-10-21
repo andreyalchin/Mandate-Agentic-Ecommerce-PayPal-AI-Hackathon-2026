@@ -44,11 +44,11 @@ describe("spend console data", () => {
     expect(a.attempts.filter((x) => x.category === "electronics").every((x) => x.outcome === "Blocked")).toBe(true);
   });
   it("merges live rows labelled Live", async () => {
-    const pay = fakePay(); const wallets = new WalletStore(); const w = wallets.save("V");
+    const pay = fakePay(); const wallets = new WalletStore(); const w = wallets.save("V", undefined, undefined, "u1");
     const svc = new MandateService(pay, wallets);
-    const m = svc.create({ userId: "u", walletRef: w.walletRef, summary: "Coffee", budget: { amount: "60.00", period: "month" }, approvalAbove: "25.00", categories: ["coffee"], expiresAt: "2027-01-01T00:00:00Z" });
+    const m = svc.create({ userId: "u1", walletRef: w.walletRef, summary: "Coffee", budget: { amount: "60.00", period: "month" }, approvalAbove: "25.00", categories: ["coffee"], expiresAt: "2027-01-01T00:00:00Z" });
     await svc.purchase(m.id, "mcp:Claude Code", [{ sku: "COF-FILTERS-100", name: "Filters", unitAmount: "6.50", quantity: 1, category: "coffee", merchant: "Ridgeline Roasters" }], "out");
-    const app = createApp({ cfg, pay, rest: new PayPalRest(cfg, (async () => new Response("{}")) as any), wallets, mandates: svc });
+    const app = createApp({ ownerOf: () => "u1", cfg, pay, rest: new PayPalRest(cfg, (async () => new Response("{}")) as any), wallets, mandates: svc });
     const r = await request(app).get("/api/console/data");
     const live = r.body.attempts.filter((x: any) => x.source === "Live");
     expect(live).toHaveLength(1); expect(live[0]).toMatchObject({ agent: "Claude Code", outcome: "Allowed", spent: 6.5 });

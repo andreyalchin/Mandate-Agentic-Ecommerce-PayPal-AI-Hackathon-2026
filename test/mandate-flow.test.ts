@@ -9,9 +9,9 @@ import { cfg, fakePay } from "./helpers.js";
 function setup() {
   const pay = fakePay();
   const wallets = new WalletStore();
-  const w = wallets.save("VAULT-SECRET-1", "CUST-1", "PayPal");
+  const w = wallets.save("VAULT-SECRET-1", "CUST-1", "PayPal", "u1");
   const mandates = new MandateService(pay, wallets);
-  const app = createApp({ cfg, pay, rest: new PayPalRest(cfg, (async () => new Response("{}")) as any), wallets, mandates });
+  const app = createApp({ ownerOf: () => "u1", cfg, pay, rest: new PayPalRest(cfg, (async () => new Response("{}")) as any), wallets, mandates });
   return { app, pay, walletRef: w.walletRef, mandates };
 }
 const body = (walletRef: string) => ({ userId: "u1", walletRef, summary: "Restock coffee and filters, under $60 a month, ask me above $25", budget: { amount: "60.00", period: "month" }, approvalAbove: "25.00", categories: ["coffee"], expiresAt: "2027-01-01T00:00:00Z" });
@@ -90,16 +90,55 @@ describe("agent purchase under a mandate", () => {
   });
   it("rejects mandates for unknown wallets and publishes a verification key", async () => {
     const { app } = setup();
-    expect((await request(app).post("/api/mandates").send(body("wal_nope"))).status).toBe(400);
+    expect((await request(app).post("/api/mandates").send(body("wal_nope"))).status).toBe(404); // unknown or not yours
     const k = await request(app).get("/.well-known/mandate-keys");
     expect(k.body.keys[0]).toMatchObject({ kty: "OKP", crv: "Ed25519" });
   });
 });
 
 describe("error mapping", () => {
-  it("returns 404 for unknown mandates and 409 for non-pending carts", async () => {
-    const { app } = setup();
+  it("returns 404 for unknown mandates and carts, 409 for non-pending carts", async () => {
+    const { app, walletRef, mandates } = setup();
     expect((await request(app).post("/api/agent/purchase").send({ mandateId: "mdt_nope", agentId: "a", items: [{ sku: "COF-FILTERS-100", quantity: 1 }], rationale: "x" })).status).toBe(404);
-    expect((await request(app).post("/api/cart-mandates/cart_nope/order")).status).toBe(409);
+    expect((await request(app).post("/api/cart-mandates/cart_nope/order")).status).toBe(404);
+    const m = (await request(app).post("/api/mandates").send(body(walletRef))).body;
+    const r = await request(app).post("/api/agent/purchase").send({ mandateId: m.id, agentId: "a", items: [{ sku: "COF-GRINDER", quantity: 1 }], rationale: "x" });
+    const cartId = r.body.cartMandate.id; mandates.decline(cartId);
+    expect((await request(app).post(`/api/cart-mandates/${cartId}/order`)).status).toBe(409);
+  });
+});
+
+describe("per-visitor sessions", () => {
+  it("keeps each browser's wallets, mandates, receipts and activity private", async () => {
+    const pay = fakePay(); const wallets = new WalletStore();
+    const app = createApp({ cfg, pay, rest: new PayPalRest(cfg, (async () => new Response("{}")) as any), wallets, harness: false });
+    const alice = request.agent(app); const bob = request.agent(app);
+    const first = await alice.get("/api/wallets");
+    expect(first.headers["set-cookie"]?.[0]).toMatch(/mandate_sid=.*HttpOnly; SameSite=Lax/);
+    const sid = /mandate_sid=([^;]+)/.exec(first.headers["set-cookie"][0])![1];
+    const w = wallets.save("VAULT-A", undefined, "PayPal", sid);
+    expect((await alice.get("/api/wallets")).body).toHaveLength(1);
+    expect((await bob.get("/api/wallets")).body).toHaveLength(0);
+    const m = (await alice.post("/api/mandates").send({ ...body(w.walletRef), userId: "someone-else" })).body;
+    expect(m.userId).toBe(sid); // owner is the session, not the request body
+    expect((await bob.post("/api/mandates").send(body(w.walletRef))).status).toBe(404); // can't use Alice's wallet
+    const buy = { mandateId: m.id, agentId: "a", items: [{ sku: "COF-FILTERS-100", quantity: 1 }], rationale: "x" };
+    expect((await alice.post("/api/agent/purchase").send(buy)).status).toBe(201);
+    expect((await bob.post("/api/agent/purchase").send(buy)).status).toBe(404);
+    expect((await bob.get(`/api/mandates/${m.id}/state`)).status).toBe(404);
+    expect((await bob.post(`/api/mandates/${m.id}/revoke`)).status).toBe(404);
+    expect((await bob.get("/api/mandates")).body).toHaveLength(0);
+    const receipt = (await alice.get("/api/receipts")).body[0];
+    expect(receipt).toBeTruthy();
+    expect((await bob.get("/api/receipts")).body).toHaveLength(0);
+    expect((await bob.post(`/api/receipts/${receipt.id}/undo`)).status).toBe(404);
+    expect((await bob.get(`/api/activity?mandateId=${m.id}`)).status).toBe(404);
+    expect((await bob.get("/api/console/data")).body.attempts.filter((a: any) => a.source === "Live")).toHaveLength(0);
+    expect((await alice.get("/api/console/data")).body.attempts.filter((a: any) => a.source === "Live")).toHaveLength(1);
+  });
+  it("hides the raw order/refund harness routes in production", async () => {
+    const app = createApp({ cfg, pay: fakePay(), rest: new PayPalRest(cfg, (async () => new Response("{}")) as any), harness: false });
+    expect((await request(app).post("/api/refunds").send({ captureId: "CAP" })).status).toBe(404);
+    expect((await request(app).post("/api/orders").send({ items: [] })).status).toBe(404);
   });
 });

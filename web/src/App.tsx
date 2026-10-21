@@ -15,7 +15,8 @@ export function App() {
   const [newMandate, setNewMandate] = useState(false);
   const [license, setLicense] = useState<string | undefined>();
   const hash = useHash(); const onConsole = hash.startsWith("#/console");
-  useEffect(() => { api<{ agStudioLicense?: string }>("/api/config").then((c) => setLicense(c.agStudioLicense)).catch(() => {}); }, []);
+  const [harness, setHarness] = useState(false);
+  useEffect(() => { api<{ agStudioLicense?: string; harness?: boolean }>("/api/config").then((c) => { setLicense(c.agStudioLicense); setHarness(!!c.harness); }).catch(() => {}); }, []);
   useEffect(() => {
     Promise.all([api<Wallet[]>("/api/wallets"), api<Mandate[]>(`/api/mandates?userId=${USER_ID}`)])
       .then(([w, m]) => { setWallet(w[0] ?? null); setMandate(m.find((x) => x.status === "active") ?? m[0] ?? null); })
@@ -37,7 +38,7 @@ export function App() {
         : boot ? <main className="setup"><section className="card"><Skeleton lines={5} /></section></main>
         : showDash ? <Dashboard mandateId={mandate!.id} onReset={() => setNewMandate(true)} />
         : <Setup wallet={wallet} onWallet={setWallet} onSigned={(m) => { setMandate(m); setNewMandate(false); }} />}
-      <footer className="foot"><span>Mandate · PayPal sandbox demo</span><a href="/harness.html">Developer harness</a></footer>
+      <footer className="foot"><span>Mandate · PayPal sandbox demo</span>{harness && <a href="/harness.html">Developer harness</a>}</footer>
     </div>
   );
 }

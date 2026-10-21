@@ -19,7 +19,7 @@ export function fakePay(overrides: Record<string, any> = {}) {
 
 export function makeApp(pay = fakePay(), restFetch?: typeof fetch, onEvent?: (e: any) => void) {
   const rest = new PayPalRest(cfg, restFetch ?? (vi.fn() as any), async () => {});
-  return { app: createApp({ cfg, pay, rest, onEvent }), pay, rest };
+  return { app: createApp({ ownerOf: () => "u1", cfg, pay, rest, onEvent }), pay, rest };
 }
 
 export const json = (status: number, body: unknown, headers: Record<string, string> = {}) =>
