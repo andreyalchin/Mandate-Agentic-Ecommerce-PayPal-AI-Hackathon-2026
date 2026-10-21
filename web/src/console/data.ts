@@ -19,17 +19,17 @@ export function buildStudioData(d: ConsoleData): AgDataSourcesDefinition {
       {
         id: "attempts", description: "One row per agent payment attempt.", data: d.attempts,
         fields: fields([
-          ["id", "Attempt ID", "textFormat", true], ["day", "Date", "dateFormat"], ["at", "Time", "textFormat", true],
+          ["id", "Attempt ID", "textFormat", true], ["day", "Day", "dateFormat"], ["at", "Time", "textFormat", true],
           ["source", "Source", "textFormat", false, "Live sandbox activity or simulated history"],
-          ["mandateId", "Mandate ID", "textFormat", true], ["agent", "Agent", "textFormat"], ["merchant", "Shop", "textFormat"], ["item", "Item", "textFormat"], ["category", "Category", "textFormat"],
+          ["mandateId", "Mandate ID", "textFormat", true], ["mandate", "Mandate", "textFormat", false, "Short mandate name, e.g. Coffee · $60/mo"], ["image", "Image", "textFormat", true], ["shipTo", "Ships to", "textFormat", false, "City the order ships to (from the PayPal order)"], ["agent", "Agent", "textFormat"], ["merchant", "Shop", "textFormat"], ["item", "Item", "textFormat"], ["category", "Category", "textFormat"],
           ["outcome", "Outcome", "textFormat"], ["decision", "Policy decision", "textFormat", true], ["rule", "Rule", "textFormat", false, "The mandate rule that decided the attempt"],
           ["reason", "Reason", "textFormat"], ["rationale", "Agent rationale", "textFormat"], ["paypalOrderId", "PayPal order", "textFormat"],
-          ["amount", "Attempted", "currencyFormat"], ["spent", "Spent", "currencyFormat", false, "Money that actually moved and was not refunded"], ["spentThisMonth", "Spent this month", "currencyFormat", false, "Spent in the current calendar month, the period monthly budgets use"], ["blockedAmount", "Blocked value", "currencyFormat"], ["attempts", "Attempts", "integerFormat"],
+          ["amount", "Amount", "currencyFormat"], ["amountText", "Amount", "textFormat", false, "Amount as text, for tables"], ["spent", "Spent", "currencyFormat", false, "Money that actually moved and was not refunded"], ["spentThisMonth", "Spent this month", "currencyFormat", false, "Spent in the current calendar month, the period monthly budgets use"], ["blockedAmount", "Blocked value", "currencyFormat"], ["attempts", "Attempts", "integerFormat"],
         ]),
       },
       {
         id: "mandates", description: "Signed intent mandates: what each agent was allowed to do.", data: d.mandates,
-        fields: fields([["id", "Mandate ID", "textFormat", true], ["summary", "Mandate", "textFormat"], ["budget", "Budget", "currencyFormat"], ["period", "Period", "textFormat"], ["askAbove", "Ask above", "currencyFormat"], ["status", "Status", "textFormat"], ["source", "Mandate source", "textFormat"]]),
+        fields: fields([["id", "Mandate ID", "textFormat", true], ["title", "Mandate", "textFormat"], ["summary", "Mandate wording", "textFormat"], ["budget", "Budget", "currencyFormat"], ["period", "Period", "textFormat"], ["askAbove", "Ask above", "currencyFormat"], ["status", "Status", "textFormat"], ["source", "Mandate source", "textFormat"]]),
       },
     ],
     relationships: [
@@ -37,7 +37,8 @@ export function buildStudioData(d: ConsoleData): AgDataSourcesDefinition {
       { id: "attempts-day-calendar", source: { tableId: "attempts", fieldId: "day" }, target: { calendarId: "calendar" } },
     ],
     // USD with a symbol everywhere (KPI tiles, grids, chart axes).
-    formats: createFormats({ overrides: { currencyFormat: { formatOptions: { format: "$#,##0.00" } } } }),
+    // Dates read like "Oct 21" in grids and filters.
+    formats: createFormats({ overrides: { currencyFormat: { formatOptions: { format: new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }) } }, dateFormat: { formatOptions: { format: new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }) } } } as any }),
     calendars: [{ id: "calendar", label: "Calendar", range: { from: { type: "date", value: days[0] ?? today }, to: { type: "date", value: days.at(-1) ?? today } }, fragments: ["year", "quarter", "month", "week", "day", "dayOfWeek"] }],
     expressions: [
       { id: "blockRate", name: "Block Rate", description: "Blocked value / attempted value", format: "percentageFormat", isMeasure: true, expression: { operator: "divide", inputs: [sumOf("attempts.blockedAmount"), sumOf("attempts.amount")] } },

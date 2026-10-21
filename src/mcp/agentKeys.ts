@@ -27,6 +27,8 @@ export class AgentKeyStore {
   get(id: string) { for (const k of this.keys.values()) if (k.id === id) return k; return undefined; }
   list(mandateId: string) { return [...this.keys.values()].filter((k) => k.mandateId === mandateId).map((k) => this.public(k)); }
   revoke(id: string) { for (const k of this.keys.values()) if (k.id === id) { k.revoked = true; return this.public(k); } return undefined; }
+  /** Remove every key for the given mandates (session reset). */
+  purge(mandateIds: Set<string>) { for (const [h, k] of this.keys) if (mandateIds.has(k.mandateId)) this.keys.delete(h); }
   dump() { return [...this.keys.values()]; }
   restore(ks: AgentKey[]) { for (const k of ks) this.keys.set(k.hash, k); }
   private public({ hash: _h, ...rest }: AgentKey) { return rest; }

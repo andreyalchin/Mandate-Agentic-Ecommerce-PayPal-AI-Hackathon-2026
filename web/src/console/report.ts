@@ -1,83 +1,69 @@
-// The spend console's opening report. Field ids ("attempts.spent") refer to ./data.ts.
+// The spending report's opening layout. Field ids ("attempts.spent") refer to ./data.ts.
+// Filters (period, mandate, your data vs sample) live in the page header and pre-filter the data.
 import type { AgPageState, AgReportState, AgWidgetLayoutState } from "ag-studio";
 
 const at = (xTrack: number, yTrack: number, xSpan: number, ySpan: number): AgWidgetLayoutState => ({ xTrack, yTrack, xSpan, ySpan });
-const title = (text: string) => ({ title: { enabled: true, text } });
+const title = (text: string, subtitle?: string) => ({ title: { enabled: true, text }, ...(subtitle && { subtitle: { enabled: true, text: subtitle } }) });
+const noTitle = { title: { enabled: false } };
 const sum = (id: string) => ({ id, aggregation: "sum" as const });
 const max = (id: string) => ({ id, aggregation: "max" as const });
-const FONT = '"Switzer", "Inter", system-ui, sans-serif';
-const typo = (fontSize: number, fontWeight: "normal" | "bold" = "normal") => ({ fontFamily: FONT, fontSize, fontWeight, fontStyle: "normal" as const });
-const kpi = (text: string, value: any, sparklineX?: string) => ({
-  type: "value" as const,
-  dataMapping: { value: [value], ...(sparklineX && { sparklineX: [{ id: sparklineX }] }) },
-  format: { title: { enabled: true, text, typography: typo(12) }, caption: { enabled: false }, style: { typography: typo(26, "bold") } },
-});
-const legend = { style: { theme: { common: { legend: { enabled: true } } } } };
+const f = (id: string) => ({ id });
 
 const overview: AgPageState = {
   id: "overview",
   widgets: {
-    source: { type: "button-filter", dataMapping: { value: [{ id: "attempts.source" }] }, format: { title: { enabled: false }, style: { selection: { type: "single" }, dimensions: { height: 30, minWidth: 92 } } } } as any,
-    "kpi-spent": kpi("Spent by agents", sum("attempts.spent"), "calendar::week"),
-    "kpi-attempts": kpi("Attempts", sum("attempts.attempts"), "calendar::week"),
-    "kpi-blocked": kpi("Blocked value", sum("attempts.blockedAmount"), "calendar::week"),
-    "kpi-blockrate": kpi("Block rate", { id: "blockRate" }),
-    meters: { type: "mandate-meter", dataMapping: { mandate: [{ id: "mandates.summary" }], spent: [sum("attempts.spentThisMonth")], budget: [max("mandates.budget")], askAbove: [max("mandates.askAbove")] }, format: title("This month vs monthly budget") } as any,
-    flow: { type: "decision-flow", dataMapping: { outcome: [{ id: "attempts.outcome" }], value: [sum("attempts.attempts")] }, format: title("What the policy engine decided") } as any,
-    weekly: { type: "column-chart-stacked", dataMapping: { categoryKey: [{ id: "calendar::week" }], valueKey: [sum("attempts.amount")], legendKey: [{ id: "attempts.outcome" }] }, format: { ...title("Attempted value by week and outcome"), ...legend } } as any,
-    rules: { type: "bar-chart-grouped", dataMapping: { categoryKey: [{ id: "attempts.rule" }], valueKey: [sum("attempts.attempts")] }, format: title("Which rule decided") } as any,
+    summary: { type: "spend-summary", dataMapping: { outcome: [f("attempts.outcome")], count: [sum("attempts.attempts")], spent: [sum("attempts.spent")], amount: [sum("attempts.amount")] }, format: noTitle } as any,
+    trend: { type: "spend-trend", dataMapping: { date: [f("attempts.day")], spent: [sum("attempts.spent")], blocked: [sum("attempts.blockedAmount")] }, format: title("Spending over time") } as any,
+    where: { type: "spend-breakdown", dataMapping: { category: [f("attempts.category")], shop: [f("attempts.merchant")], spent: [sum("attempts.spent")] }, format: title("Where it went") } as any,
+    meters: { type: "mandate-meter", dataMapping: { mandate: [f("mandates.title")], spent: [sum("attempts.spentThisMonth")], budget: [max("mandates.budget")], askAbove: [max("mandates.askAbove")] }, format: title("Budgets this month") } as any,
+    flow: { type: "decision-flow", dataMapping: { outcome: [f("attempts.outcome")], value: [sum("attempts.attempts")] }, format: title("How your rules decided") } as any,
     ledger: {
       type: "grid",
-      dataMapping: { cols: [{ id: "attempts.day" }, { id: "attempts.item" }, { id: "attempts.outcome" }, { id: "attempts.rule" }, sum("attempts.amount"), { id: "attempts.source" }] },
-      sort: [{ field: { id: "attempts.day" }, direction: "desc" }],
-      format: title("Every attempt, newest first"),
+      dataMapping: { cols: [f("attempts.day"), f("attempts.item"), f("attempts.merchant"), f("attempts.outcome"), f("attempts.mandate"), f("attempts.amountText")] },
+      sort: [{ field: f("attempts.day"), direction: "desc" }],
+      format: title("Every attempt", "Newest first. Blocked rows moved no money."),
     } as any,
   },
   widgetLayout: {
-    source: at(0, 0, 8, 3),
-    "kpi-spent": at(0, 3, 6, 7), "kpi-attempts": at(6, 3, 6, 7), "kpi-blocked": at(12, 3, 6, 7), "kpi-blockrate": at(18, 3, 6, 7),
-    meters: at(0, 10, 12, 12), flow: at(12, 10, 12, 12),
-    weekly: at(0, 22, 14, 22), rules: at(14, 22, 10, 22),
-    ledger: at(0, 44, 24, 26),
+    summary: at(0, 0, 24, 7),
+    trend: at(0, 7, 16, 16), where: at(16, 7, 8, 16),
+    meters: at(0, 23, 12, 15), flow: at(12, 23, 12, 15),
+    ledger: at(0, 38, 24, 24),
   },
 };
 
 const agents: AgPageState = {
   id: "agents",
   widgets: {
-    "by-agent": { type: "column-chart-stacked", dataMapping: { categoryKey: [{ id: "attempts.agent" }], valueKey: [sum("attempts.attempts")], legendKey: [{ id: "attempts.outcome" }] }, format: { ...title("Attempts by agent and outcome"), ...legend } } as any,
-    "spend-tree": { type: "treemap-chart", dataMapping: { categoryKey: [{ id: "attempts.agent" }, { id: "attempts.merchant" }], valueKey: [sum("attempts.spent")] }, format: title("Where agents spent") } as any,
-    "category-sunburst": { type: "sunburst-chart", dataMapping: { categoryKey: [{ id: "attempts.category" }, { id: "attempts.outcome" }], valueKey: [sum("attempts.amount")] }, format: title("Attempted value by category and outcome") } as any,
-    blocked: {
+    cards: { type: "agent-cards", dataMapping: { agent: [f("attempts.agent")], outcome: [f("attempts.outcome")], count: [sum("attempts.attempts")], spent: [sum("attempts.spent")], amount: [sum("attempts.amount")] }, format: noTitle } as any,
+    rules: { type: "rule-list", dataMapping: { rule: [f("attempts.rule")], count: [sum("attempts.attempts")] }, format: title("Which rule decided") } as any,
+    activity: {
       type: "grid",
-      dataMapping: { cols: [{ id: "attempts.day" }, { id: "attempts.agent" }, { id: "attempts.item" }, { id: "attempts.rule" }, { id: "attempts.reason" }, sum("attempts.blockedAmount")] },
-      filter: [{ field: { id: "attempts.outcome" }, type: "set", values: ["Blocked"] }],
-      sort: [{ field: { id: "attempts.day" }, direction: "desc" }],
-      format: title("Blocked attempts and the rule that stopped them"),
+      dataMapping: { cols: [f("attempts.day"), f("attempts.agent"), f("attempts.item"), f("attempts.outcome"), f("attempts.rule"), f("attempts.amountText")] },
+      sort: [{ field: f("attempts.day"), direction: "desc" }],
+      format: title("What each agent tried", "Every attempt with the rule that decided it"),
     } as any,
   },
-  widgetLayout: { "by-agent": at(0, 0, 12, 20), "spend-tree": at(12, 0, 12, 20), "category-sunburst": at(0, 20, 9, 22), blocked: at(9, 20, 15, 22) },
+  widgetLayout: { cards: at(0, 0, 24, 15), rules: at(0, 15, 9, 24), activity: at(9, 15, 15, 24) },
 };
+/** How many rows each list-like widget needs for the data on screen. */
+export interface Counts { agents: number; rules: number; mandates: number; groups: number; rows?: number }
+const agentsDesk = (c: Counts): AgPageState => { const h = Math.ceil(Math.max(1, c.agents) / 3) * 13 + 2; return { ...agents, widgetLayout: { cards: at(0, 0, 24, h), rules: at(0, h, 9, 24), activity: at(9, h, 15, 24) } }; };
 
 export const pageTitles: Record<string, string> = { overview: "Overview", agents: "Agents" };
 
 /** Phones: AG Studio's canvas has no responsive mode, so stack every widget full width. */
-const stack = (page: AgPageState, order: string[], heights: Record<string, number>, kpiPairs = true): AgPageState => {
-  const widgetLayout: Record<string, AgWidgetLayoutState> = {}; let y = 0; let half = 0;
-  for (const id of order) {
-    const h = heights[id] ?? 18;
-    if (kpiPairs && id.startsWith("kpi-")) { widgetLayout[id] = at(half ? 12 : 0, y, 12, h); if (half) y += h; half = half ? 0 : 1; continue; }
-    if (half) { y += heights["kpi-spent"] ?? 6; half = 0; }
-    widgetLayout[id] = at(0, y, 24, h); y += h;
-  }
+const stack = (page: AgPageState, order: [string, number][]): AgPageState => {
+  const widgetLayout: Record<string, AgWidgetLayoutState> = {}; let y = 0;
+  for (const [id, h0] of order) { const h = Math.ceil(h0); widgetLayout[id] = at(0, y, 24, h); y += h; }
   return { ...page, widgetLayout };
 };
-const mobileOverview = stack(overview, ["source", "kpi-spent", "kpi-attempts", "kpi-blocked", "kpi-blockrate", "meters", "flow", "weekly", "rules", "ledger"],
-  { source: 3, "kpi-spent": 6, "kpi-attempts": 6, "kpi-blocked": 6, "kpi-blockrate": 6, meters: 11, flow: 17, weekly: 22, rules: 18, ledger: 26 });
-const mobileAgents = stack(agents, ["by-agent", "spend-tree", "category-sunburst", "blocked"], { "by-agent": 18, "spend-tree": 18, "category-sunburst": 20, blocked: 24 });
+const mobileOverview = (c: Counts) => stack(overview, [["summary", 13], ["trend", 17], ["where", 7 + Math.min(7, Math.max(1, c.groups)) * 3], ["meters", 5 + Math.max(1, c.mandates) * 4], ["flow", 16], ["ledger", 7 + Math.min(14, Math.max(2, c.rows ?? 14)) * 1.4]]);
+const mobileAgents = (c: Counts) => stack(agents, [["cards", 3 + Math.max(1, c.agents) * 13], ["rules", 5 + Math.max(1, c.rules) * 3.5], ["activity", 7 + Math.min(14, Math.max(2, c.rows ?? 14)) * 1.4]]);
 
 /** Canvas height in rows for a page, so the phone page can scroll naturally instead of inside a box. */
 export const pageRows = (p: AgPageState) => Math.max(...Object.values(p.widgetLayout ?? {}).map((l: any) => l.yTrack + l.ySpan));
 const base = { panels: { filters: { collapsed: true }, data: { collapsed: true } } };
-export const consoleReport: AgReportState = { selectedPageId: overview.id, pages: [overview, agents], ...base } as any;
-export const mobileReport: AgReportState = { selectedPageId: overview.id, pages: [mobileOverview, mobileAgents], ...base } as any;
+const ONE: Counts = { agents: 3, rules: 5, mandates: 2, groups: 3 };
+export const reportFor = (phone: boolean, page: string, c: Counts = ONE): AgReportState => ({ selectedPageId: page, pages: phone ? [mobileOverview(c), mobileAgents(c)] : [overview, agentsDesk(c)], ...base }) as any;
+export const consoleReport = reportFor(false, "overview");

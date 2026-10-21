@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { api, amt, dateOf, money, timeOf, type ActivityEvent, type AgentRun, type AgentStep, type CartMandate, type MandateState, type Receipt } from "./api";
-import { Count, Icon, MicButton, PayPalButton, Skeleton, Spinner } from "./ui";
+import { api, amt, dateOf, mandateTitle, money, shipLine, shortDate, timeOf, type ActivityEvent, type AgentRun, type AgentStep, type CartMandate, type Mandate, type MandateState, type Receipt } from "./api";
+import { Count, Icon, MicButton, PayPalButton, Skeleton, Spinner, useDismiss } from "./ui";
 import { useSpeech } from "./speech";
 
 const PROMPTS = [
@@ -18,6 +18,40 @@ function agentLabel(id: string) { return id.startsWith("mcp:") ? id.slice(4) : i
 
 /* ---------- Mandate ---------- */
 
+function MandateSwitcher({ mandates, current, onSelect, onNew }: { mandates: Mandate[]; current: string; onSelect: (id: string) => void; onNew: () => void }) {
+  const [open, setOpen] = useState(false);
+  const cur = mandates.find((m) => m.id === current);
+  const [tab, setTab] = useState<"active" | "revoked">(cur?.status === "revoked" ? "revoked" : "active");
+  const ref = useDismiss(open, () => setOpen(false));
+  const list = mandates.filter((m) => m.status === tab);
+  const n = (st: string) => mandates.filter((m) => m.status === st).length;
+  if (!cur) return null;
+  return (
+    <div className="switcher" ref={ref}>
+      <button className="switch-btn" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <span className={`switch-icon ${cur.status}`}>{cur.status === "active" ? Icon.shield(16) : Icon.archive(16)}</span>
+        <span className="switch-text"><b>{mandateTitle(cur)}</b><span>{cur.status === "active" ? "Active" : "Archived"} · {mandates.length} mandate{mandates.length === 1 ? "" : "s"}</span></span>
+        <span className="chev">{Icon.chevron(16)}</span>
+      </button>
+      {open && <div className="menu switch-menu">
+        <div className="seg full" role="tablist">
+          <button role="tab" aria-selected={tab === "active"} className={tab === "active" ? "on" : ""} onClick={() => setTab("active")}>Active <span className="count">{n("active")}</span></button>
+          <button role="tab" aria-selected={tab === "revoked"} className={tab === "revoked" ? "on" : ""} onClick={() => setTab("revoked")}>Archived <span className="count">{n("revoked")}</span></button>
+        </div>
+        <ul className="switch-list" role="listbox" aria-label={tab === "active" ? "Active mandates" : "Archived mandates"}>
+          {list.length === 0 && <li className="xs muted switch-empty">{tab === "active" ? "No active mandates. Create one below." : "Revoked mandates appear here, with their orders kept."}</li>}
+          {list.map((m) => <li key={m.id}><button role="option" aria-selected={m.id === current} className={m.id === current ? "on" : ""} onClick={() => { onSelect(m.id); setOpen(false); }}>
+            <span className="sl-top"><b>{mandateTitle(m)}</b>{m.id === current && Icon.check(14)}</span>
+            <span className="sl-sub">{m.summary}</span>
+            <span className="sl-meta">Signed {shortDate(m.createdAt)} · {m.status === "active" ? `expires ${shortDate(m.expiresAt)}` : "revoked"}</span>
+          </button></li>)}
+        </ul>
+        <button className="btn sm full" onClick={() => { setOpen(false); onNew(); }}>{Icon.plus(15)} New mandate</button>
+      </div>}
+    </div>
+  );
+}
+
 function MandateCard({ st, onRevoke }: { st: MandateState; onRevoke: () => void }) {
   const m = st.mandate; const pct = Math.min(100, (st.spentCents / Math.max(1, st.budgetCents)) * 100);
   const [confirm, setConfirm] = useState(false);
@@ -25,7 +59,7 @@ function MandateCard({ st, onRevoke }: { st: MandateState; onRevoke: () => void 
   return (
     <section className="card mandate" aria-labelledby="mh">
       <header className="card-head">
-        <h2 id="mh" className="card-title">Your mandate</h2>
+        <h2 id="mh" className="card-title">Mandate rules</h2>
         {m.status === "active" ? <span className="status ok"><i />Active</span> : <span className="status bad"><i />Revoked</span>}
       </header>
       <p className="summary" title={m.summary}>{m.summary}</p>
@@ -223,7 +257,7 @@ function Activity({ rows, loading }: { rows: Row[]; loading: boolean }) {
 
 /* ---------- Page ---------- */
 
-export function Dashboard({ mandateId, onReset }: { mandateId: string; onReset: () => void }) {
+export function Dashboard({ mandateId, mandates, onSelect, onNew, onChanged, onReset }: { mandateId: string; mandates: Mandate[]; onSelect: (id: string) => void; onNew: () => void; onChanged: () => void; onReset: () => void }) {
   const [st, setSt] = useState<MandateState | null>(null);
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [carts, setCarts] = useState<CartMandate[]>([]);
@@ -251,7 +285,7 @@ export function Dashboard({ mandateId, onReset }: { mandateId: string; onReset: 
       return {
         key: r.id, at: r.at, kind: refunded ? "refunded" : "bought", title: lineText(r.lines), cents: r.totalCents,
         sub: `${r.lines[0]?.merchant ?? ""} · ${timeOf(r.at)}${refunded ? " · refunded" : ""}`,
-        details: [{ label: "Allowed by", value: r.allowedBy.startsWith("approval:") ? "Your one-time approval" : r.reason }, { label: "Agent", value: agentLabel(r.agentId) }],
+        details: [{ label: "Allowed by", value: r.allowedBy.startsWith("approval:") ? "Your one-time approval" : r.reason }, { label: "Sold by", value: r.lines[0]?.merchant ?? "" }, { label: "Ships to", value: r.shipTo ? shipLine(r.shipTo) : "Your PayPal address on file" }, { label: "Agent", value: agentLabel(r.agentId) }],
         quote: r.rationale, ref: r.orderId,
         onUndo: refunded ? undefined : async () => { await api(`/api/receipts/${r.id}/undo`, {}); setNotes([{ role: "note", tone: "ok", content: `Refunded ${money(r.totalCents)} for ${r.lines[0]?.name}. It no longer counts against your budget.` }]); refresh(); },
       };
@@ -276,9 +310,10 @@ export function Dashboard({ mandateId, onReset }: { mandateId: string; onReset: 
           </button>))}
       </nav>
       <div className="col-side pane-mandate">
-        {st ? <MandateCard st={st} onRevoke={async () => { await api(`/api/mandates/${mandateId}/revoke`, {}); refresh(); }} /> : <section className="card"><Skeleton lines={6} /></section>}
-        {st && <ConnectAgent mandateId={mandateId} active={st.mandate.status === "active"} />}
-        {st?.mandate.status === "revoked" && <button className="btn primary full" onClick={onReset}>Create a new mandate</button>}
+        <MandateSwitcher mandates={mandates} current={mandateId} onSelect={onSelect} onNew={onNew} />
+        {st ? <MandateCard st={st} onRevoke={async () => { await api(`/api/mandates/${mandateId}/revoke`, {}); refresh(); onChanged(); }} /> : <section className="card"><Skeleton lines={6} /></section>}
+        {st?.mandate.status === "revoked" && <button className="btn primary full" onClick={onNew}>{Icon.plus(15)} Create a new mandate</button>}
+        {st && st.mandate.status === "active" && <ConnectAgent mandateId={mandateId} active />}
       </div>
       <div className="col-chat pane-chat">
         <Agent mandateId={mandateId} active={st?.mandate.status !== "revoked"} onChange={refresh} notes={notes} onToast={setToast} />

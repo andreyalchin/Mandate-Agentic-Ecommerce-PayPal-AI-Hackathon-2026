@@ -10,8 +10,17 @@ export interface AttemptRow {
   amount: number; spent: number; spentThisMonth: number; blockedAmount: number; attempts: number;
   outcome: "Allowed" | "Approved by you" | "Waiting for you" | "Declined by you" | "Blocked" | "Refunded";
   decision: "allow" | "needs_approval" | "deny"; rule: string; reason: string; rationale: string; paypalOrderId: string;
+  /** Short mandate name for filters and labels, e.g. "Coffee · $60/mo". */ mandate: string; /** "$9.00" for grids. */ amountText?: string; image?: string; shipTo?: string;
 }
-export interface MandateRow { id: string; summary: string; budget: number; period: string; askAbove: number; status: string; source: "Live" | "Simulated" }
+export interface MandateRow { id: string; title: string; summary: string; budget: number; period: string; askAbove: number; status: string; source: "Live" | "Simulated" }
+
+const PER: Record<string, string> = { month: "/mo", week: "/wk", once: " total" };
+const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
+/** "Coffee & kitchen · $60/mo": short enough for a dropdown or a chart label. */
+export function mandateTitle(m: Pick<IntentMandate, "categories" | "budget">) {
+  const cats = m.categories.slice(0, 2).map(cap).join(" & ").replace(/ & (\w)/, (_x, c) => ` & ${c.toLowerCase()}`) + (m.categories.length > 2 ? " +" : "");
+  return `${cats} · $${Number(m.budget.amount).toFixed(0)}${PER[m.budget.period] ?? ""}`;
+}
 
 const RULE_LABEL: Record<string, string> = {
   within_mandate: "Within mandate", approval_threshold: "Over ask-above", budget: "Over budget", category: "Category not allowed",
@@ -20,20 +29,21 @@ const RULE_LABEL: Record<string, string> = {
 export const ruleLabel = (r: string) => RULE_LABEL[r] ?? r;
 const agentName = (id: string) => (id.startsWith("mcp:") ? id.slice(4) : id === "mandate-claude-agent" ? "Shopping agent" : id);
 const usd = (c: number) => Math.round(c) / 100;
-function withThisMonth(rows: AttemptRow[], now = new Date()) { const m = now.toISOString().slice(0, 7); for (const r of rows) r.spentThisMonth = r.at.slice(0, 7) === m ? r.spent : 0; }
+function withThisMonth(rows: AttemptRow[], now = new Date()) { const m = now.toISOString().slice(0, 7); for (const r of rows) { r.spentThisMonth = r.at.slice(0, 7) === m ? r.spent : 0; r.amountText = `$${r.amount.toFixed(2)}`; } }
 
 /** Live rows from the mandate service: receipts, pending/declined approvals and blocked attempts. */
 export function liveRows(svc: MandateService): { attempts: AttemptRow[]; mandates: MandateRow[] } {
   const attempts: AttemptRow[] = [];
-  const base = (at: string, mandateId: string, agentId: string, lines: { name: string; quantity: number; merchant: string; category: string }[]) => ({
-    at, day: at.slice(0, 10), source: "Live" as const, mandateId, agent: agentName(agentId), merchant: lines[0]?.merchant ?? "", category: lines[0]?.category ?? "",
+  const titles = new Map([...svc.mandates.values()].map((m) => [m.id, mandateTitle(m)]));
+  const base = (at: string, mandateId: string, agentId: string, lines: { name: string; quantity: number; merchant: string; category: string; image?: string }[]) => ({
+    at, day: at.slice(0, 10), source: "Live" as const, mandateId, mandate: titles.get(mandateId) ?? "", image: lines[0]?.image, agent: agentName(agentId), merchant: lines[0]?.merchant ?? "", category: lines[0]?.category ?? "",
     item: lines.map((l) => `${l.quantity > 1 ? `${l.quantity} × ` : ""}${l.name}`).join(", "), attempts: 1,
   });
   for (const r of svc.receipts.values()) {
     const approved = r.allowedBy.startsWith("approval:");
     attempts.push({ id: r.id, ...base(r.at, r.mandateId, r.agentId, r.lines), amount: usd(r.totalCents), spent: r.status === "refunded" ? 0 : usd(r.totalCents), spentThisMonth: 0, blockedAmount: 0,
       outcome: r.status === "refunded" ? "Refunded" : approved ? "Approved by you" : "Allowed", decision: approved ? "needs_approval" : "allow",
-      rule: ruleLabel(approved ? "approval" : "within_mandate"), reason: r.reason, rationale: r.rationale, paypalOrderId: r.orderId });
+      rule: ruleLabel(approved ? "approval" : "within_mandate"), reason: r.reason, rationale: r.rationale, paypalOrderId: r.orderId, shipTo: r.shipTo ? [r.shipTo.city, r.shipTo.region].filter(Boolean).join(", ") : undefined });
   }
   for (const c of svc.carts.values()) {
     if (c.status === "approved") continue; // shows as its receipt
@@ -42,11 +52,11 @@ export function liveRows(svc: MandateService): { attempts: AttemptRow[]; mandate
   }
   for (const e of svc.log) {
     if (e.decision !== "deny") continue;
-    attempts.push({ id: e.id, at: e.at, day: e.at.slice(0, 10), source: "Live", mandateId: e.mandateId, agent: agentName(e.agentId), merchant: "", item: e.items, category: "", amount: usd(e.totalCents), spent: 0, spentThisMonth: 0, blockedAmount: usd(e.totalCents), attempts: 1,
+    attempts.push({ id: e.id, at: e.at, day: e.at.slice(0, 10), source: "Live", mandateId: e.mandateId, mandate: titles.get(e.mandateId) ?? "", agent: agentName(e.agentId), merchant: "", item: e.items, category: "", amount: usd(e.totalCents), spent: 0, spentThisMonth: 0, blockedAmount: usd(e.totalCents), attempts: 1,
       outcome: "Blocked", decision: "deny", rule: ruleLabel(e.rule), reason: e.reason, rationale: e.rationale, paypalOrderId: "" });
   }
   withThisMonth(attempts);
-  const mandates = [...svc.mandates.values()].map((m) => ({ id: m.id, summary: m.summary, budget: Number(m.budget.amount), period: m.budget.period, askAbove: Number(m.approvalAbove), status: m.status, source: "Live" as const }));
+  const mandates = [...svc.mandates.values()].map((m) => ({ id: m.id, title: titles.get(m.id)!, summary: m.summary, budget: Number(m.budget.amount), period: m.budget.period, askAbove: Number(m.approvalAbove), status: m.status, source: "Live" as const }));
   return { attempts, mandates };
 }
 
@@ -81,11 +91,11 @@ export function simulatedRows(now = new Date()): { attempts: AttemptRow[]; manda
       else if (p.decision === "needs_approval") { outcome = r() < (p.rule === "budget" ? 0.15 : 0.65) ? "Approved by you" : "Declined by you"; }
       else outcome = "Blocked";
       if (outcome === "Allowed" || outcome === "Approved by you") { spent = p.totalCents; spend.push({ mandateId: m.id, totalCents: p.totalCents, at, status: "captured" }); }
-      attempts.push({ id: `sim_${++n}`, at, day: at.slice(0, 10), source: "Simulated", mandateId: m.id, agent, merchant: lines[0].merchant, item: `${lines[0].quantity > 1 ? `${lines[0].quantity} × ` : ""}${lines[0].name}`, category: lines[0].category,
+      attempts.push({ id: `sim_${++n}`, at, day: at.slice(0, 10), source: "Simulated", mandateId: m.id, mandate: mandateTitle(m), shipTo: "San Jose, CA", agent, merchant: lines[0].merchant, item: `${lines[0].quantity > 1 ? `${lines[0].quantity} × ` : ""}${lines[0].name}`, category: lines[0].category,
         amount: usd(p.totalCents), spent: usd(spent), spentThisMonth: 0, blockedAmount: outcome === "Blocked" ? usd(p.totalCents) : 0, attempts: 1, outcome, decision: p.decision,
         rule: ruleLabel(outcome === "Approved by you" ? "approval" : p.rule), reason: p.reason, rationale: "", paypalOrderId: "" });
     }
   }
   withThisMonth(attempts, now);
-  return { attempts, mandates: sims.map((m) => ({ id: m.id, summary: m.summary, budget: Number(m.budget.amount), period: m.budget.period, askAbove: Number(m.approvalAbove), status: m.status, source: "Simulated" as const })) };
+  return { attempts, mandates: sims.map((m) => ({ id: m.id, title: mandateTitle(m), summary: m.summary, budget: Number(m.budget.amount), period: m.budget.period, askAbove: Number(m.approvalAbove), status: m.status, source: "Simulated" as const })) };
 }

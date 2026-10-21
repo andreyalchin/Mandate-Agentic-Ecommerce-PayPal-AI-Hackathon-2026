@@ -5,10 +5,17 @@ import type { WalletStore } from "../server/walletStore.js";
 import { evaluate, periodStart, type SpendRecord } from "./policy.js";
 import { MandateSigner } from "./signing.js";
 import { cartCents, fmt, toCents } from "./money.js";
-import { IntentMandateInput, type CartLine, type CartMandate, type IntentMandate, type PolicyResult, type Receipt } from "./types.js";
+import { IntentMandateInput, type CartLine, type CartMandate, type IntentMandate, type PolicyResult, type Receipt, type ShipTo } from "./types.js";
+
+/** The shipping address PayPal attached to an order (buyer's address on file for physical goods). */
+export function shipToOf(order: any): ShipTo | undefined {
+  const sh = order?.purchase_units?.[0]?.shipping ?? order?.purchaseUnits?.[0]?.shipping; const a = sh?.address;
+  if (!a) return undefined;
+  return { name: sh.name?.full_name ?? sh.name?.fullName, line1: a.address_line_1 ?? a.addressLine1, city: a.admin_area_2 ?? a.adminArea2, region: a.admin_area_1 ?? a.adminArea1, postalCode: a.postal_code ?? a.postalCode, country: a.country_code ?? a.countryCode };
+}
 
 /** Mandate categories are ours; PayPal only needs physical vs digital. */
-const toItems = (lines: CartLine[]) => lines.map(({ sku, name, unitAmount, quantity, category }) => ({ sku, name, unitAmount, quantity, category: category === "digital" ? ("DIGITAL_GOODS" as const) : ("PHYSICAL_GOODS" as const) }));
+const toItems = (lines: CartLine[]) => lines.map(({ sku, name, unitAmount, quantity, category }: CartLine) => ({ sku, name, unitAmount, quantity, category: category === "digital" ? ("DIGITAL_GOODS" as const) : ("PHYSICAL_GOODS" as const) }));
 const id = (p: string) => `${p}_${randomUUID().replace(/-/g, "").slice(0, 16)}`;
 const signable = ({ signature: _s, status: _st, ...rest }: IntentMandate) => rest;
 
@@ -97,7 +104,7 @@ export class MandateService {
     }
     if (order.status === "PAYER_ACTION_REQUIRED") return handOff("PayPal asked for you to confirm this payment.");
     if (order.status === "APPROVED") order = await this.pay.captureOrder(order.id!);
-    const receipt = this.record(mandateId, agentId, lines, `mandate:${policy.rule}`, policy.reason, rationale, order.id!, captureIdOf(order), order.status === "COMPLETED" ? "captured" : "pending");
+    const receipt = this.record(mandateId, agentId, lines, `mandate:${policy.rule}`, policy.reason, rationale, order.id!, captureIdOf(order), order.status === "COMPLETED" ? "captured" : "pending", shipToOf(order));
     return { decision: "allow", receipt, policy };
   }
 
@@ -115,7 +122,7 @@ export class MandateService {
     if (!cm?.orderId) throw Object.assign(new Error("no approval order"), { status: 409 });
     const order = await this.pay.captureOrder(cm.orderId);
     cm.status = "approved";
-    return this.record(cm.mandateId, cm.agentId, cm.lines, `approval:${cm.id}`, `You approved this one purchase (${fmt(cm.totalCents)}).`, cm.rationale, order.id!, captureIdOf(order), "captured");
+    return this.record(cm.mandateId, cm.agentId, cm.lines, `approval:${cm.id}`, `You approved this one purchase (${fmt(cm.totalCents)}).`, cm.rationale, order.id!, captureIdOf(order), "captured", shipToOf(order));
   }
 
   decline(cartId: string) { const cm = this.carts.get(cartId); if (cm) cm.status = "declined"; return cm; }
@@ -126,12 +133,34 @@ export class MandateService {
     if (!r?.captureId) throw Object.assign(new Error("receipt has no capture"), { status: 409 });
     if (r.status === "refunded") return r;
     await this.pay.refundCapture(r.captureId, undefined, "Undone from Mandate");
-    r.status = "refunded";
+    r.status = "refunded"; r.refundedAt = this.now().toISOString();
     return r;
   }
 
-  private record(mandateId: string, agentId: string, lines: CartLine[], allowedBy: string, reason: string, rationale: string, orderId: string, captureId: string | undefined, status: Receipt["status"]) {
-    const r: Receipt = { id: id("rcp"), mandateId, agentId, lines, totalCents: cartCents(lines), allowedBy, reason, rationale: rationale.slice(0, 500), orderId, captureId, status, at: this.now().toISOString() };
+  /** Order details straight from PayPal (status, ship-to, payer); fills in a missing ship-to on the receipt. */
+  async orderDetails(receiptId: string) {
+    const r = this.receipts.get(receiptId);
+    if (!r) throw Object.assign(new Error("unknown receipt"), { status: 404 });
+    const o: any = await this.pay.getOrder(r.orderId);
+    const shipTo = shipToOf(o); if (shipTo && !r.shipTo) r.shipTo = shipTo;
+    const pu = o?.purchase_units?.[0] ?? o?.purchaseUnits?.[0]; const cap = pu?.payments?.captures?.[0]; const pn = o?.payer?.name ?? {};
+    return { orderId: r.orderId, status: o?.status, shipTo: shipTo ?? r.shipTo,
+      payer: o?.payer ? { name: [pn.given_name ?? pn.givenName, pn.surname].filter(Boolean).join(" "), email: o.payer.email_address ?? o.payer.emailAddress } : undefined,
+      capture: cap ? { id: cap.id, status: cap.status, amount: cap.amount?.value, at: cap.create_time ?? cap.createTime } : undefined, createdAt: o?.create_time ?? o?.createTime };
+  }
+
+  /** Forget everything a session owns (its mandates and their carts, receipts and activity). PayPal records are untouched. */
+  purge(owner: string) {
+    const ids = new Set([...this.mandates.values()].filter((m) => m.userId === owner).map((m) => m.id));
+    for (const id of ids) this.mandates.delete(id);
+    for (const [k, c] of this.carts) if (ids.has(c.mandateId)) this.carts.delete(k);
+    for (const [k, r] of this.receipts) if (ids.has(r.mandateId)) this.receipts.delete(k);
+    for (let i = this.log.length - 1; i >= 0; i--) if (ids.has(this.log[i].mandateId)) this.log.splice(i, 1);
+    return ids;
+  }
+
+  private record(mandateId: string, agentId: string, lines: CartLine[], allowedBy: string, reason: string, rationale: string, orderId: string, captureId: string | undefined, status: Receipt["status"], shipTo?: ShipTo) {
+    const r: Receipt = { id: id("rcp"), mandateId, agentId, lines, totalCents: cartCents(lines), allowedBy, reason, rationale: rationale.slice(0, 500), orderId, captureId, status, at: this.now().toISOString(), ...(shipTo && { shipTo }) };
     this.receipts.set(r.id, r);
     return r;
   }

@@ -7,8 +7,9 @@ export interface Mandate {
 }
 export type MandateInput = Omit<Mandate, "id" | "createdAt" | "status" | "signature">;
 export interface MandateState { mandate: Mandate; budgetCents: number; spentCents: number; remainingCents: number; periodStart: string; signatureValid: boolean; fingerprint: string }
-export interface Line { sku: string; name: string; unitAmount: string; quantity: number; category: Category; merchant: string }
-export interface Receipt { id: string; mandateId: string; agentId: string; lines: Line[]; totalCents: number; allowedBy: string; reason: string; rationale: string; orderId: string; captureId?: string; status: "captured" | "refunded" | "pending"; at: string }
+export interface Line { sku: string; name: string; unitAmount: string; quantity: number; category: Category; merchant: string; image?: string; url?: string }
+export interface ShipTo { name?: string; line1?: string; city?: string; region?: string; postalCode?: string; country?: string }
+export interface Receipt { id: string; mandateId: string; agentId: string; lines: Line[]; totalCents: number; allowedBy: string; reason: string; rationale: string; orderId: string; captureId?: string; status: "captured" | "refunded" | "pending"; at: string; shipTo?: ShipTo; refundedAt?: string }
 export interface CartMandate { id: string; mandateId: string; agentId: string; lines: Line[]; totalCents: number; rationale: string; policy: { reason: string; rule: string }; status: "pending" | "approved" | "declined" | "expired"; createdAt: string; orderId?: string }
 export interface ActivityEvent { id: string; at: string; mandateId: string; agentId: string; decision: "allow" | "needs_approval" | "deny"; rule: string; reason: string; totalCents: number; items: string; rationale: string }
 export interface Wallet { walletRef: string; label?: string; createdAt: string }
@@ -30,3 +31,14 @@ export const per = (p: Mandate["budget"]["period"]) => (p === "once" ? "in total
 export const timeOf = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 export const dateOf = (iso: string) => new Date(iso).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
 export const USER_ID = "demo-user";
+
+const PER: Record<string, string> = { month: "/mo", week: "/wk", once: " total" };
+const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
+/** Short mandate name, e.g. "Coffee & kitchen · $60/mo" (same rule as the server's console rows). */
+export function mandateTitle(m: Pick<Mandate, "categories" | "budget">) {
+  const c = m.categories.slice(0, 2); const cats = c.map((x, i) => (i ? x : cap(x))).join(" & ") + (m.categories.length > 2 ? " +" : "");
+  return `${cats} · $${Number(m.budget.amount).toFixed(0)}${PER[m.budget.period] ?? ""}`;
+}
+export const shipLine = (s?: ShipTo) => (s ? [s.line1, [s.city, s.region].filter(Boolean).join(", "), s.postalCode].filter(Boolean).join(", ") : "");
+export const shortDate = (iso: string) => new Date(iso).toLocaleDateString([], { month: "short", day: "numeric" });
+export const agentLabel = (id: string) => (id.startsWith("mcp:") ? id.slice(4) : id === "mandate-claude-agent" ? "Shopping agent" : id);

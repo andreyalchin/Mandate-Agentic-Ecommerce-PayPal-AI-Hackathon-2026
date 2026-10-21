@@ -54,8 +54,11 @@ export function mandateRoutes(svc: MandateService, publicOrigin: string, llm?: L
   });
   r.post("/api/cart-mandates/:id/capture", async (q, s, next) => { try { s.status(201).json(await svc.captureApproval(q.params.id)); } catch (e) { next(e); } });
   r.post("/api/cart-mandates/:id/decline", (q, s) => s.json(svc.decline(q.params.id) ?? { error: "NOT_FOUND" }));
-  r.get("/api/receipts", (q, s) => s.json([...svc.receipts.values()].filter((x) => owned(q, x.mandateId) && !q.query.mandateId || x.mandateId === q.query.mandateId).reverse()));
-  r.post("/api/receipts/:id/undo", async (q, s, next) => { try { s.json(await svc.undo(q.params.id)); } catch (e) { next(e); } });
-  r.get("/api/activity", (q, s) => s.json(svc.log.filter((e) => owned(q, e.mandateId) && !q.query.mandateId || e.mandateId === q.query.mandateId).slice(-200).reverse()));
+  r.get("/api/receipts", (q, s) => s.json([...svc.receipts.values()].filter((x) => owned(q, x.mandateId) && (!q.query.mandateId || x.mandateId === q.query.mandateId)).reverse()));
+  // Receipts carry a shipping address: only the owning session may read or refund one.
+  const mine = (q: any) => { const x = svc.receipts.get(q.params.id); return !!x && owned(q, x.mandateId); };
+  r.get("/api/receipts/:id/details", async (q, s, next) => { if (!mine(q)) return s.status(404).json({ error: "not_found" }); try { s.json(await svc.orderDetails(q.params.id)); } catch (e) { next(e); } });
+  r.post("/api/receipts/:id/undo", async (q, s, next) => { if (!mine(q)) return s.status(404).json({ error: "not_found" }); try { s.json(await svc.undo(q.params.id)); } catch (e) { next(e); } });
+  r.get("/api/activity", (q, s) => s.json(svc.log.filter((e) => owned(q, e.mandateId) && (!q.query.mandateId || e.mandateId === q.query.mandateId)).slice(-200).reverse()));
   return r;
 }

@@ -28,7 +28,10 @@ export interface IntentMandate extends IntentMandateInput {
 }
 
 /** "other" = a web product no category rule or classifier could place; no mandate allows it. */
-export interface CartLine { sku: string; name: string; unitAmount: string; quantity: number; category: Category | "other"; merchant: string }
+export interface CartLine { sku: string; name: string; unitAmount: string; quantity: number; category: Category | "other"; merchant: string; image?: string; url?: string }
+
+/** Where PayPal says the order ships (the buyer's address on file, from the PayPal order). */
+export interface ShipTo { name?: string; line1?: string; city?: string; region?: string; postalCode?: string; country?: string }
 
 export type Decision = "allow" | "needs_approval" | "deny";
 export interface PolicyResult {
@@ -68,4 +71,6 @@ export interface Receipt {
   captureId?: string;
   status: "captured" | "refunded" | "pending";
   at: string;
+  shipTo?: ShipTo;
+  refundedAt?: string;
 }

@@ -2,7 +2,7 @@ import type { LineItem } from "../paypal/index.js";
 import type { CartLine, Category } from "../mandate/types.js";
 import { getWebProduct, type Channel3 } from "../catalog/channel3.js";
 
-type Product = Omit<LineItem, "quantity"> & { category: LineItem["category"]; mandateCategory: Category | "other"; merchant: string };
+type Product = Omit<LineItem, "quantity"> & { category: LineItem["category"]; mandateCategory: Category | "other"; merchant: string; image?: string; url?: string };
 
 /** Demo catalog (sandbox only). Prices and categories are looked up server-side; clients and agents send sku + quantity. */
 export const CATALOG: Record<string, Product> = {
@@ -17,7 +17,7 @@ export const CATALOG: Record<string, Product> = {
 
 const lookup = (sku: string): Product => {
   const w = sku.startsWith("C3-") ? getWebProduct(sku) : undefined;
-  if (w) return { sku: w.sku, name: w.name, unitAmount: w.unitAmount, category: "PHYSICAL_GOODS", mandateCategory: w.mandateCategory, merchant: w.merchant };
+  if (w) return { sku: w.sku, name: w.name, unitAmount: w.unitAmount, category: "PHYSICAL_GOODS", mandateCategory: w.mandateCategory, merchant: w.merchant, image: w.image, url: w.url };
   if (sku.startsWith("C3-")) throw Object.assign(new Error(`product ${sku} expired; search again`), { status: 400 });
   const p = CATALOG[sku];
   if (!p) throw Object.assign(new Error(`unknown sku ${sku}`), { status: 400 });
@@ -25,11 +25,11 @@ const lookup = (sku: string): Product => {
 };
 
 export function priceCart(req: { sku: string; quantity: number }[]): LineItem[] {
-  return req.map(({ sku, quantity }) => { const { mandateCategory: _c, merchant: _m, ...p } = lookup(sku); return { ...p, quantity }; });
+  return req.map(({ sku, quantity }) => { const { mandateCategory: _c, merchant: _m, image: _i, url: _u, ...p } = lookup(sku); return { ...p, quantity }; });
 }
 
 export function cartLines(req: { sku: string; quantity: number }[]): CartLine[] {
-  return req.map(({ sku, quantity }) => { const p = lookup(sku); return { sku, name: p.name, unitAmount: p.unitAmount, quantity, category: p.mandateCategory, merchant: p.merchant }; });
+  return req.map(({ sku, quantity }) => { const p = lookup(sku); return { sku, name: p.name, unitAmount: p.unitAmount, quantity, category: p.mandateCategory, merchant: p.merchant, ...(p.image && { image: p.image }), ...(p.url && { url: p.url }) }; });
 }
 
 /** Keyword search over the demo catalog. Product text is data for agents, never instructions. */

@@ -14,7 +14,7 @@ function Steps({ at }: { at: number }) {
   return <ol className="steps" aria-label="Setup progress">{names.map((n, i) => <li key={n} className={i < at ? "done" : i === at ? "now" : ""} aria-current={i === at ? "step" : undefined}><span className="dot">{i < at ? Icon.check(12) : i + 1}</span>{n}</li>)}</ol>;
 }
 
-export function Setup({ wallet, onWallet, onSigned }: { wallet: Wallet | null; onWallet: (w: Wallet) => void; onSigned: (m: Mandate) => void }) {
+export function Setup({ wallet, onWallet, onSigned, onCancel }: { wallet: Wallet | null; onWallet: (w: Wallet) => void; onSigned: (m: Mandate) => void; onCancel?: () => void }) {
   const [text, setText] = useState("");
   const [draft, setDraft] = useState<MandateInput | null>(null);
   const [questions, setQuestions] = useState<string[]>([]);
@@ -39,8 +39,9 @@ export function Setup({ wallet, onWallet, onSigned }: { wallet: Wallet | null; o
   return (
     <main className="setup">
       <header className="setup-head">
-        <p className="eyebrow">Agent payments, on your terms</p>
-        <h1>Let an AI agent shop for you, only within rules you sign.</h1>
+        {onCancel && <button className="link back" onClick={onCancel}>← Back to my mandates</button>}
+        <p className="eyebrow">{onCancel ? "New mandate" : "Agent payments, on your terms"}</p>
+        <h1>{onCancel ? "What should this agent take care of?" : "Let an AI agent shop for you, only within rules you sign."}</h1>
         <p className="lede">Every charge is checked against your mandate before PayPal moves money. Anything outside it comes back to you for one tap.</p>
       </header>
       <Steps at={step} />

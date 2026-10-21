@@ -66,6 +66,21 @@ export function createApp({ cfg, pay, rest, wallets = new WalletStore(), mandate
   app.get("/api/health", (_req, res) => res.json({ ok: true, env: cfg.env }));
 
   app.get("/api/wallets", (req, res) => res.json(wallets.list(req.owner)));
+  /**
+   * Reset this browser's session. "fresh" forgets mandates, orders and activity but keeps PayPal linked;
+   * "new" also unlinks PayPal and issues a new anonymous session, as if a different person opened the app.
+   * Only Mandate's copy is removed; PayPal keeps its own order records.
+   */
+  app.post("/api/session/reset", (req, res) => {
+    const mode = req.body?.mode === "new" ? "new" : "fresh"; const owner = req.owner!;
+    const ids = svc.purge(owner); agentKeys.purge(ids);
+    let unlinked = 0;
+    if (mode === "new") {
+      for (const w of wallets.dump()) if (w.owner === owner) { wallets.delete(w.walletRef); unlinked++; }
+      res.append("Set-Cookie", `mandate_sid=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${cfg.publicOrigin.startsWith("https://") ? "; Secure" : ""}`);
+    }
+    res.json({ mode, removedMandates: ids.size, unlinkedWallets: unlinked });
+  });
   app.get("/api/config", (_req, res) => res.json({ env: cfg.env, sdkUrl: webSdkUrl(cfg.env), clientId: cfg.clientId.startsWith("proxy") ? undefined : cfg.clientId, agStudioLicense: process.env.AG_STUDIO_LICENSE || undefined, ai: keyKind(process.env.ANTHROPIC_API_KEY), webhook: !!cfg.webhookId, harness }));
 
   app.post("/api/client-token", async (_req, res, next) => {
