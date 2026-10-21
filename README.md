@@ -17,9 +17,8 @@ The app runs in PayPal **sandbox**. Use this sandbox buyer account (sandbox mone
 
 Each browser gets its own private session, so your wallet, mandates and receipts are visible only to you.
 
-> If PayPal says "Something went wrong… PayPal isn't available at this time", your browser is probably signed in to another PayPal sandbox or developer account. Open the demo in a private or incognito window and log in with the account above.
 
-1. **Link PayPal.** Open the demo and click the PayPal button. Log in with the account above and agree to save PayPal. This creates a vaulted PayPal wallet; the vault id never reaches the browser.
+1. **Link PayPal.** Click the PayPal button and log in with the account above. PayPal shows a $1.00 authorization: it saves your PayPal wallet in PayPal's vault and is voided right away, so nothing is charged. The vault id never reaches the browser.
 2. **Describe the rules.** Pick a suggestion or type your own, then click **Draft my mandate**. Claude turns your sentence into structured terms and lists anything it had to assume.
 3. **Review and sign.** Check the budget, the "ask me above" amount, the categories, the shops and the expiry, then click **Sign mandate**. The mandate is signed with Ed25519; the public key is at `/.well-known/mandate-keys`.
 4. **Let the agent shop.** Use the suggestion chips in the Shopping agent panel:
@@ -54,7 +53,7 @@ flowchart LR
 - **The model never decides whether to pay.** Claude drafts mandates and does the shopping, but every payment goes through a deterministic policy engine (`src/mandate/policy.ts`). It checks status, expiry, merchant, category, the per-purchase approval limit and the running budget. Prices and categories are fixed on the server by SKU; agents only send a SKU and a quantity.
 - **PayPal does the money movement:**
   - Server SDK Orders, with idempotency keys, to charge the saved wallet when the buyer isn't present.
-  - Vault setup and payment tokens through the v6 Web SDK to save PayPal.
+  - Linking with a $1.00 `AUTHORIZE` order and `store_in_vault: ON_SUCCESS`, voided right after. PayPal's save-without-purchase page fails in the sandbox for current Chrome browsers, so this path is used instead.
   - Human-present checkout for approvals.
   - Refunds for undo.
   - Webhooks verified with `verify-webhook-signature`.
