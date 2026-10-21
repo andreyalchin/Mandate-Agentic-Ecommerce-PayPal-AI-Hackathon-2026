@@ -29,14 +29,18 @@ export function createApp({ cfg, pay, rest, wallets = new WalletStore(), mandate
   // Sandbox-only negative testing: forward ?mock=<PayPal-Mock-Response JSON> to PayPal.
   const mockOf = (req: Request) => (cfg.env === "sandbox" && typeof req.query.mock === "string" ? req.query.mock : undefined);
 
+  // Non-sensitive delivery stats (no payloads) so a deploy can confirm PayPal events arrive and verify.
+  const hooks = { verified: 0, rejected: 0, last: undefined as undefined | { type: string; at: string } };
+  app.get("/api/webhooks/status", (_q, s) => s.json({ configured: !!cfg.webhookId, ...hooks }));
   // Webhooks need the raw body for signature verification, so register before express.json().
   app.post("/api/webhooks/paypal", express.raw({ type: "*/*", limit: "1mb" }), async (req, res, next) => {
     try {
       const raw = Buffer.isBuffer(req.body) ? req.body.toString("utf8") : "";
       if (!cfg.webhookId) return res.status(503).json({ error: "PAYPAL_WEBHOOK_ID not configured" });
       const ok = await verifyWebhook(rest, cfg.webhookId, req.headers, raw);
-      if (!ok) return res.status(400).json({ error: "INVALID_SIGNATURE" });
+      if (!ok) { hooks.rejected++; return res.status(400).json({ error: "INVALID_SIGNATURE" }); }
       const event = JSON.parse(raw);
+      hooks.verified++; hooks.last = { type: String(event.event_type ?? ""), at: new Date().toISOString() };
       if (inbox.firstTime(event.id)) await onEvent?.(event);
       res.sendStatus(200); // ack fast; PayPal retries non-2xx
     } catch (e) { next(e); }
