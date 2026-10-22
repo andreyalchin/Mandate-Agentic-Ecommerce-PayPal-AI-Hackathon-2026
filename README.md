@@ -1,6 +1,6 @@
 # Mandate - Agentic Ecommerce (PayPal AI Hackathon 2026)
 
-![Mandate: let AI agents shop for your household, only within rules you sign](docs/pitch/01-cover.png)
+![Mandate: let an AI agent shop for your household, only within rules you sign](docs/pitch/01-cover.png)
 
 **Let an AI agent shop for you, only within rules you sign.**
 
@@ -23,11 +23,13 @@ Mandate turns a sentence like "keep me stocked on coffee, no more than $60 a mon
 
 ![How it works](docs/pitch/03-how-it-works.png)
 
-![Control built in](docs/pitch/04-control.png)
+![The Shop](docs/pitch/04-shop.png)
 
-![Visibility](docs/pitch/05-visibility.png)
+![Control built in](docs/pitch/05-control.png)
 
-![The platform](docs/pitch/06-platform.png)
+![Visibility](docs/pitch/06-visibility.png)
+
+![The platform](docs/pitch/07-platform.png)
 
 Market figures: McKinsey & Company, [The agentic commerce opportunity](https://www.mckinsey.com/capabilities/quantumblack/our-insights/the-agentic-commerce-opportunity-how-ai-agents-are-ushering-in-a-new-era-for-consumers-and-merchants). Slide source: [`docs/pitch/deck.html`](docs/pitch/deck.html).
 

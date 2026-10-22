@@ -193,7 +193,7 @@ function Agent({ mandateId, active, onChange, notes, onToast }: { mandateId: str
         </div>}
         {msgs.map((m, i) => m.role === "note"
           ? <p key={i} className={`note ${m.tone ?? ""}`}>{m.content}</p>
-          : <div key={i} className={`msg ${m.role}`}>{m.steps && m.steps.length > 0 && <Steps steps={m.steps} />}<p>{m.content}</p></div>)}
+          : <div key={i} className={`msg ${m.role}`}>{m.steps && m.steps.length > 0 && <Steps steps={m.steps} />}<MsgText text={m.content} /></div>)}
         {busy && <div className="msg assistant pending"><Spinner /> Checking your mandate…</div>}
       </div>
       <div className="dock">
@@ -325,4 +325,15 @@ export function Dashboard({ mandateId, mandates, onSelect, onNew, onChanged, onR
       {(err || toast) && <p className={`toast ${err ? "err" : ""}`} role="status">{err ?? toast}</p>}
     </main>
   );
+}
+
+/** Agent replies: plain paragraphs plus "- item" lines shown as a tidy list; stray markdown markers removed. */
+function MsgText({ text }: { text: string }) {
+  const clean = String(text ?? "").replace(/\*\*(.+?)\*\*/g, "$1").replace(/(^|\s)[-•]\s+(?=[A-Z0-9$])/g, (m, pre, off, all) => (all.slice(0, off).trim().endsWith(":") || /\n\s*$/.test(all.slice(0, off + pre.length)) || /\d\s*$/.test(all.slice(0, off).trim()) ? "\n- " : m));
+  const blocks: Array<{ list: boolean; lines: string[] }> = [];
+  for (const raw of clean.split(/\n+/)) { const line = raw.trim(); if (!line) continue; const li = /^[-•]\s+/.test(line); const last = blocks[blocks.length - 1];
+    if (li) { let item = line.replace(/^[-•]\s+/, ""), tail = ""; const t = item.match(/^(.*?\$\d[\d,]*(?:\.\d\d)?)\s+([A-Z][^$]*)$/); if (t) { item = t[1]; tail = t[2]; }
+      if (last?.list) last.lines.push(item); else blocks.push({ list: true, lines: [item] }); if (tail) blocks.push({ list: false, lines: [tail] }); }
+    else blocks.push({ list: false, lines: [line] }); }
+  return <>{blocks.map((b, i) => b.list ? <ul key={i} className="msg-list">{b.lines.map((l, j) => <li key={j}>{l}</li>)}</ul> : <p key={i}>{b.lines[0]}</p>)}</>;
 }
