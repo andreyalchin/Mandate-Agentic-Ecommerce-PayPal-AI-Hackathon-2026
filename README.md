@@ -112,7 +112,7 @@ All AI features use **Claude** through the Anthropic Messages API (`@anthropic-a
 | **AG Grid: AG Studio** | The Spending console: two custom widgets (mandate budget meter, policy decision flow), a theme built from the app's design tokens, and the Claude-backed **Mandate auditor** custom agent working with AG Studio's built-in lead agent. | [`web/src/console/`](web/src/console/), [`src/console/`](src/console/) |
 | **Channel3** | Real products and live prices over Channel3's MCP server. The agent's searches call it; the cheapest in-stock new USD offer is chosen. | [`src/catalog/channel3.ts`](src/catalog/channel3.ts) |
 | **APIMatic: Context Plugin** | Used while building to check the PayPal Server SDK integration (vaulted charges, `PAYER_ACTION_REQUIRED`, refunds, webhooks). It led to one behavior change, documented with the raw answers. | [`docs/apimatic-context-plugin.md`](docs/apimatic-context-plugin.md), [`docs/apimatic/`](docs/apimatic/) |
-| **Render** | Hosts the live demo as an always-on web service with a persistent disk, deployed from the Blueprint in this repo; every push to `main` redeploys. | [`render.yaml`](render.yaml) |
+| **Render** | Hosts the live demo as an always-on web service with a persistent disk, deployed from the Blueprint in this repo; every push to `master` redeploys. | [`render.yaml`](render.yaml) |
 
 ## Built with
 
