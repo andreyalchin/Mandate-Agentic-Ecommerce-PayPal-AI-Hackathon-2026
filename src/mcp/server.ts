@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { MandateService } from "../mandate/service.js";
 import { fmt } from "../mandate/money.js";
 import { cartLines, findProducts } from "../server/catalog.js";
+import { shelfView } from "../server/shopRoutes.js";
 import type { AgentKeyStore } from "./agentKeys.js";
 
 const Items = z.array(z.object({ sku: z.string().min(1), quantity: z.number().int().min(1).max(20) })).min(1).max(10);
@@ -27,6 +28,12 @@ export function buildMcpServer(svc: MandateService, mandateId: string, agentId: 
     const st = svc.state(mandateId); const m = st.mandate;
     return json({ summary: m.summary, status: m.status, budget: `${fmt(st.budgetCents)} per ${m.budget.period}`, spent: fmt(st.spentCents), remaining: fmt(st.remainingCents), ask_user_above: `$${m.approvalAbove}`, categories: m.categories, shops: m.merchants ?? "any", expires: m.expiresAt });
   });
+
+  server.registerTool("get_shelf", {
+    title: "Get repeat list",
+    description: "The person's repeat list: exact items (brand, size, pack), preferred store, quantity, cadence, sku and whether this mandate allows each one. Use it to restock.",
+    inputSchema: {}, annotations: { readOnlyHint: true },
+  }, async () => { const m = svc.state(mandateId).mandate; const v = shelfView(svc, m); return json({ items: v.items.map((x) => ({ sku: x.sku, name: x.name, store: x.storeChosen, price: x.price, quantity: x.qty, every_days: x.every, mandate: x.verdict.decision })), monthly_estimate: (v.monthlyCents / 100).toFixed(2) }); });
 
   server.registerTool("search_products", {
     title: "Search products",

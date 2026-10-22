@@ -3,6 +3,7 @@ import { api, USER_ID, type Mandate, type Wallet } from "./api";
 import { Dashboard } from "./Dashboard";
 import { Setup } from "./Setup";
 import { Orders } from "./Orders";
+import { Shop } from "./Shop";
 import { CreatedBy } from "./CreatedBy";
 import { Icon, Skeleton, Spinner, Wordmark, useDismiss } from "./ui";
 
@@ -11,8 +12,8 @@ const ConsolePage = lazy(() => import("./console/ConsolePage"));
 const useHash = () => { const [h, setH] = useState(location.hash); useEffect(() => { const f = () => setH(location.hash); addEventListener("hashchange", f); return () => removeEventListener("hashchange", f); }, []); return h; };
 const CURRENT = "mandate.current";
 
-type Route = "agent" | "orders" | "spending";
-const routeOf = (h: string): Route => (h.startsWith("#/orders") ? "orders" : h.startsWith("#/spending") || h.startsWith("#/console") ? "spending" : "agent");
+type Route = "agent" | "shop" | "orders" | "spending";
+const routeOf = (h: string): Route => (h.startsWith("#/shop") ? "shop" : h.startsWith("#/orders") ? "orders" : h.startsWith("#/spending") || h.startsWith("#/console") ? "spending" : "agent");
 
 function AccountMenu({ wallet, onReset }: { wallet: Wallet | null; onReset: (mode: "fresh" | "new") => Promise<void> }) {
   const [open, setOpen] = useState(false); const [confirm, setConfirm] = useState<"fresh" | "new" | null>(null); const [busy, setBusy] = useState(false);
@@ -64,6 +65,7 @@ export function App() {
   }
   const page = route === "spending" ? <Suspense fallback={<main className="setup"><section className="card"><Skeleton lines={5} /></section></main>}><ConsolePage licenseKey={license} mandates={mandates} onChanged={load} /></Suspense>
     : route === "orders" ? <Orders mandates={mandates} />
+    : route === "shop" ? (boot ? <main className="setup"><section className="card"><Skeleton lines={5} /></section></main> : <Shop mandates={mandates} onPick={(id) => { setCurrentId(id); localStorage.setItem(CURRENT, id); }} />)
     : boot ? <main className="setup"><section className="card"><Skeleton lines={5} /></section></main>
     : current && !creating ? <Dashboard key={current.id} mandateId={current.id} mandates={mandates} onSelect={select} onNew={() => setCreating(true)} onChanged={load} onReset={() => { load(); }} />
     : <Setup wallet={wallet} onWallet={setWallet} onCancel={current ? () => setCreating(false) : undefined} onSigned={(m) => { setMandates((x) => [m, ...x]); select(m.id); }} />;
@@ -73,6 +75,7 @@ export function App() {
         <div className="row nav-left"><a href="#/" className="home" aria-label="Mandate home"><Wordmark /></a>
           <nav className="tabs" aria-label="Sections">
             <a href="#/" className={route === "agent" ? "on" : ""}>Agent</a>
+            <a href="#/shop" className={route === "shop" ? "on" : ""}>Shop</a>
             <a href="#/orders" className={route === "orders" ? "on" : ""}>Orders</a>
             <a href="#/spending" className={route === "spending" ? "on" : ""}>Spending</a>
           </nav>

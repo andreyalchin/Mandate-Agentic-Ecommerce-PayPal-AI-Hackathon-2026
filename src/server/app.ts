@@ -10,6 +10,7 @@ import { priceCart } from "./catalog.js";
 import { WalletStore } from "./walletStore.js";
 import { MandateService } from "../mandate/service.js";
 import { mandateRoutes, type Llm } from "./mandateRoutes.js";
+import { shopRoutes } from "./shopRoutes.js";
 import { mcpRoutes } from "../mcp/server.js";
 import { keyKind } from "../ai/claude.js";
 import { cookieOwner, ownership, type OwnerOf } from "./session.js";
@@ -60,6 +61,7 @@ export function createApp({ cfg, pay, rest, wallets = new WalletStore(), mandate
   app.use(ownership(ownerOf ?? cookieOwner(cfg.publicOrigin.startsWith("https://")), svc, wallets, agentKeys));
 
   app.use(mandateRoutes(svc, cfg.publicOrigin, llm));
+  app.use(shopRoutes(svc));
   app.use(mcpRoutes(svc, agentKeys, cfg.publicOrigin));
   app.use(consoleRoutes(svc, llm));
 

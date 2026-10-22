@@ -1,6 +1,7 @@
 import type { LineItem } from "../paypal/index.js";
 import type { CartLine, Category } from "../mandate/types.js";
 import { getWebProduct, type Channel3 } from "../catalog/channel3.js";
+import { searchShop, shopLookup } from "../catalog/shop.js";
 
 type Product = Omit<LineItem, "quantity"> & { category: LineItem["category"]; mandateCategory: Category | "other"; merchant: string; image?: string; url?: string };
 
@@ -18,6 +19,7 @@ export const CATALOG: Record<string, Product> = {
 const lookup = (sku: string): Product => {
   const w = sku.startsWith("C3-") ? getWebProduct(sku) : undefined;
   if (w) return { sku: w.sku, name: w.name, unitAmount: w.unitAmount, category: "PHYSICAL_GOODS", mandateCategory: w.mandateCategory, merchant: w.merchant, image: w.image, url: w.url };
+  if (sku.startsWith("SH-")) { const x = shopLookup(sku); return { sku, name: x.name, unitAmount: x.unitAmount, category: x.digital ? "DIGITAL_GOODS" : "PHYSICAL_GOODS", mandateCategory: x.mandateCategory, merchant: x.merchant, image: x.image }; }
   if (sku.startsWith("C3-")) throw Object.assign(new Error(`product ${sku} expired; search again`), { status: 400 });
   const p = CATALOG[sku];
   if (!p) throw Object.assign(new Error(`unknown sku ${sku}`), { status: 400 });
@@ -51,7 +53,7 @@ export const webCatalogEnabled = () => !!web;
  * the agent only ever sends sku + quantity back.
  */
 export async function findProducts(q: string, limit = 5) {
-  const demo = searchProducts(q).map((p) => ({ ...p, source: "demo shop" }));
+  const demo = [...searchShop(q).map((p) => ({ ...p, source: "Mandate shop" })), ...searchProducts(q).map((p) => ({ ...p, source: "demo shop" }))];
   if (!web) return { products: demo };
   try {
     const live = (await web.search(q, limit)).map((p) => ({

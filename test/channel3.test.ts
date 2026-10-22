@@ -37,7 +37,7 @@ describe("Channel3 web catalog", () => {
   it("search merges demo shops with live results and degrades if Channel3 fails", async () => {
     setWebCatalog({ search: async () => [(await toWebProduct(grinder as any))!] } as any);
     const r = await findProducts("grinder");
-    expect(r.products.map((p) => p.source)).toEqual(["demo shop", "Channel3 live price"]);
+    expect(r.products.map((p) => p.source)).toEqual(["Mandate shop", "demo shop", "Channel3 live price"]);
     setWebCatalog({ search: async () => { throw new Error("timeout"); } } as any);
     expect((await findProducts("grinder")).note).toMatch(/unavailable/);
     setWebCatalog(undefined);

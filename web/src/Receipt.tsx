@@ -164,14 +164,14 @@ export function ReceiptView({ r, mandate, sample, onClose, closeLabel = "← Ord
 }
 
 /** Centered pop-up (bottom sheet on phones). The page behind stops scrolling, so there is only one scroll at a time. */
-export function Modal({ label, onClose, children }: { label: string; onClose: () => void; children: ReactNode }) {
+export function Modal({ label, onClose, children, className = "" }: { label: string; onClose: () => void; children: ReactNode; className?: string }) {
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const k = (e: KeyboardEvent) => e.key === "Escape" && onClose(); addEventListener("keydown", k);
     const prev = document.body.style.overflow; document.body.style.overflow = "hidden"; box.current?.focus();
     return () => { removeEventListener("keydown", k); document.body.style.overflow = prev; };
   }, []);
-  return createPortal(<div className="modal-bg" onMouseDown={(e) => e.target === e.currentTarget && onClose()}><div className="modal" role="dialog" aria-modal="true" aria-label={label} tabIndex={-1} ref={box}>{children}</div></div>, document.body);
+  return createPortal(<div className="modal-bg" onMouseDown={(e) => e.target === e.currentTarget && onClose()}><div className={`modal ${className}`} role="dialog" aria-modal="true" aria-label={label} tabIndex={-1} ref={box}>{children}</div></div>, document.body);
 }
 
 /* ---------- Attempt pop-up (Spending → Purchase history) ---------- */

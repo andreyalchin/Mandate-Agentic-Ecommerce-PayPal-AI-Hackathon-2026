@@ -30,11 +30,11 @@ describe("Mandate MCP server", () => {
     const r = await fetch(`${base}/mcp`, { method: "POST", headers: { "content-type": "application/json", accept: "application/json, text/event-stream" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }) });
     expect(r.status).toBe(401);
   });
-  it("issues a key and exposes four tools", async () => {
+  it("issues a key and exposes five tools", async () => {
     const r = await (await fetch(`${base}/api/mandates/${m.id}/agent-keys`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ agentName: "Claude Desktop" }) })).json();
     expect(r.key).toMatch(/^mk_/); expect(r.mcpUrl).toMatch(/\/mcp$/);
     const c = await connect(r.key);
-    expect((await c.listTools()).tools.map((t) => t.name).sort()).toEqual(["check_cart", "get_mandate", "request_payment", "search_products"]);
+    expect((await c.listTools()).tools.map((t) => t.name).sort()).toEqual(["check_cart", "get_mandate", "get_shelf", "request_payment", "search_products"]);
     expect(parse(await c.callTool({ name: "get_mandate", arguments: {} }))).toMatchObject({ remaining: "$60.00", categories: ["coffee"] });
     await c.close();
   });

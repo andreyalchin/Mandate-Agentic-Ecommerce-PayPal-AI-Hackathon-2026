@@ -52,3 +52,10 @@ The Agent page's Agents card lists the built-in Shopping agent and each connecte
 
 ## Orders v4
 "Your orders / Sample" toggle (sample = 46 simulated orders from 7 agents, paid and refunded). Filters: status with counts, search (item, shop, agent), period, mandate, and agent chips with counts. Each row and receipt shows which agent bought it.
+
+## Shop (catalog, stores, repeat list)
+Nav: Agent, Shop, Orders, Spending. `#/shop` has three tabs:
+- **On repeat**: the repeat list for the selected mandate. Until it's edited, it's suggested from the mandate's categories. Each row has a store (best price or a named store), how often (1 week to 3 months), quantity, cost per month and the policy verdict. A summary compares the monthly total with the budget, with breakdowns by store and category. **Restock now** sends "Restock my repeat list." to the agent chat, and the agent calls `get_shelf` then `purchase`.
+- **Products**: category chips (categories outside the mandate are dashed and the products dimmed), search, product cards. The product sheet has brand, size and pack chips; offers from each store with unit price, delivery, Best price and Fastest tags and the per-offer verdict; quantity, how often and cost per month; **Add to repeat** or **Buy once now**, which sends that SKU to the agent; and similar items.
+- **Stores**: 8 stores with their categories, product count, items on your list, monthly spend there, and whether the mandate allows them. **See products** filters Products to that store.
+API: `GET /api/shop/catalog[?mandateId]`, `GET/PUT /api/mandates/:id/shelf`.
