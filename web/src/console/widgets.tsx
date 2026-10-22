@@ -5,7 +5,7 @@
 //  - Breakdown: where the money went, by category or shop.
 //  - Mandate meter: spent vs budget per mandate, ask-above threshold marked.
 //  - Decision flow: how attempts split into allowed, needed-you and blocked.
-//  - Agent cards: one card per agent with spend, purchases, approvals and blocks.
+//  - Mandate cards: one card per active mandate with its parameters, spend, purchases, approvals and blocks.
 //  - Rule list: which mandate rule decided attempts.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createWidgets } from "ag-studio-react";
@@ -214,25 +214,37 @@ function DecisionFlow(props: any) {
 
 /* ---------- Agent cards ---------- */
 const initials = (s: string) => s.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("");
-function AgentCards(props: any) {
-  const rows = useMapped(props, ["agent", "outcome", "count", "spent", "amount"]);
+const PERIOD: Record<string, string> = { month: "a month", week: "a week", once: "total" };
+const endDate = (iso: string) => { const d = new Date(iso); return isNaN(+d) ? "" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); };
+/** One card per active mandate: its signed parameters and what the agent did under it. */
+function MandateCards(props: any) {
+  const rows = useMapped(props, ["mandate", "outcome", "count", "spent", "amount"]);
   if (!rows) return null;
-  const agents = new Map<string, { spent: number; bought: number; asked: number; blocked: number; blockedValue: number; total: number }>();
+  type M = { spent: number; bought: number; asked: number; blocked: number; blockedValue: number; total: number; period: string; budget: number; askAbove: number; categories: string; expiresAt: string };
+  // Signed parameters come straight from the page's mandate list; the data engine supplies the totals.
+  const meta: any[] = ((window as any).__mandateMeta ?? []).filter((m: any) => m.status === "active");
+  const ms = new Map<string, M>(meta.map((m) => [m.title, { spent: 0, bought: 0, asked: 0, blocked: 0, blockedValue: 0, total: 0, period: m.period, budget: m.budget, askAbove: m.askAbove, categories: m.categories ?? "", expiresAt: m.expiresAt ?? "" }]));
   for (const r of rows) {
-    const a = agents.get(r.agent) ?? { spent: 0, bought: 0, asked: 0, blocked: 0, blockedValue: 0, total: 0 }; const c = Number(r.count) || 0;
-    a.spent += Number(r.spent) || 0; a.total += c;
+    const a = ms.get(String(r.mandate)); if (!a) continue;
+    const c = Number(r.count) || 0; a.spent += Number(r.spent) || 0; a.total += c;
     if (PURCHASED.has(r.outcome)) a.bought += c;
     if (["Approved by you", "Declined by you", "Waiting for you"].includes(r.outcome)) a.asked += c;
     if (r.outcome === "Blocked") { a.blocked += c; a.blockedValue += Number(r.amount) || 0; }
-    agents.set(r.agent, a);
   }
-  const list = [...agents.entries()].sort((a, b) => b[1].spent - a[1].spent);
+  const list = [...ms.entries()].sort((a, b) => b[1].spent - a[1].spent);
+  if (!list.length) return <p className="w-sub w-empty">No active mandates.</p>;
   return (
     <div className="w-agents">
       {list.map(([name, a], i) => (
-        <article key={name} className="w-agent drillable" tabIndex={0} onClick={(e) => { if (!(e.target as HTMLElement).closest(".w-agent-rm")) drill(name, { agent: name }); }} onKeyDown={(e) => { if (e.target === e.currentTarget) onKey(() => drill(name, { agent: name }))(e); }}>
-          <header><span className="w-avatar" style={{ background: `var(--c${i}-soft)`, color: `var(--c${i})` }}>{initials(name)}</span><span className="w-agent-name"><b>{name}</b><span>{name === "Shopping agent" ? "Built-in agent" : "Outside agent"}</span></span>
-            <button className="w-agent-rm" onClick={(e) => { e.stopPropagation(); window.dispatchEvent(new CustomEvent("mandate:remove-agent", { detail: { name } })); }} aria-label={`Remove ${name}`} title="Remove agent"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12M9 7V4h6v3" /></svg></button></header>
+        <article key={name} className="w-agent w-mandate drillable" tabIndex={0} onClick={(e) => { if (!(e.target as HTMLElement).closest(".w-agent-rm")) drill(name.split(" · ")[0], { mandate: name }); }} onKeyDown={(e) => { if (e.target === e.currentTarget) onKey(() => drill(name.split(" · ")[0], { mandate: name }))(e); }}>
+          <header><span className="w-avatar" style={{ background: `var(--c${i % 6}-soft)`, color: `var(--c${i % 6})` }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z" /><path d="M9 12l2 2 4-4" /></svg></span>
+            <span className="w-agent-name"><b>{name.split(" · ")[0]}</b><span>{a.expiresAt ? `Active until ${endDate(a.expiresAt)}` : "Active"}</span></span>
+            <button className="w-agent-rm" onClick={(e) => { e.stopPropagation(); window.dispatchEvent(new CustomEvent("mandate:remove-mandate", { detail: { name } })); }} aria-label={`Revoke ${name}`} title="Revoke mandate"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></svg></button></header>
+          <ul className="w-params">
+            <li><span>Budget</span><b className="num">{usd(a.budget)} {PERIOD[a.period] ?? ""}</b></li>
+            <li><span>Asks first above</span><b className="num">{usd(a.askAbove)}</b></li>
+            <li><span>Can buy</span><b>{a.categories || "—"}</b></li>
+          </ul>
           <div className="w-agent-big"><span className="w-value num">{usd(a.spent)}</span><span className="w-sub">spent</span></div>
           <dl>
             <div><dt>Bought</dt><dd className="num">{num(a.bought)}</dd></div>
@@ -240,7 +252,7 @@ function AgentCards(props: any) {
             <div><dt>Blocked</dt><dd className="num">{num(a.blocked)}</dd></div>
           </dl>
           <div className="w-agent-bar" aria-label="Outcome mix"><span className="ok" style={{ flexGrow: a.bought }} /><span className="warn" style={{ flexGrow: a.asked }} /><span className="bad" style={{ flexGrow: a.blocked }} /></div>
-          <p className="w-sub">{a.total ? `${Math.round((a.bought / a.total) * 100)}% of attempts bought without asking` : "No attempts"}{a.blockedValue ? ` · ${usd(a.blockedValue)} stopped` : ""}</p>
+          <p className="w-sub">{a.total ? `${Math.round((a.bought / a.total) * 100)}% bought without asking` : "No purchases yet"}{a.blockedValue ? ` · ${usd(a.blockedValue)} stopped` : ""}</p>
         </article>))}
     </div>
   );
@@ -268,7 +280,7 @@ function RuleList(props: any) {
 
 
 /* ---------- Purchase history ---------- */
-const PH_SLOTS = ["id", "at", "item", "merchant", "agent", "outcome", "amount", "image", "mandate", "mandateId", "rule", "reason", "rationale", "source"];
+const PH_SLOTS = ["id", "at", "item", "merchant", "outcome", "amount", "image", "mandate", "mandateId", "rule", "reason", "rationale", "source"];
 const PH_FILTERS: [string, string, (o: string) => boolean][] = [
   ["all", "All", () => true], ["bought", "Bought", (o) => o === "Allowed"], ["approved", "Approved by you", (o) => o === "Approved by you"],
   ["declined", "Declined by you", (o) => o === "Declined by you"], ["blocked", "Blocked", (o) => o === "Blocked"], ["refunded", "Refunded", (o) => o === "Refunded"], ["waiting", "Waiting for you", (o) => o === "Waiting for you"],
@@ -302,14 +314,14 @@ function PurchaseHistory(props: any) {
         <label className="ph-select"><span className="sr">Sort</span><select value={sort} onChange={(e) => { setSort(e.target.value as PhSort); setPg(0); }}>
           <option value="new">Newest first</option><option value="old">Oldest first</option><option value="high">Highest amount</option><option value="low">Lowest amount</option></select></label>
       </div>
-      {!narrow && <div className="ph-row ph-head" aria-hidden><span /><span>Item</span><span>Agent</span><span>Outcome</span>{head("date", "Date")}<span className="r">{head("amount", "Amount")}</span></div>}
+      {!narrow && <div className="ph-row ph-head" aria-hidden><span /><span>Item</span><span>Shop</span><span>Outcome</span>{head("date", "Date")}<span className="r">{head("amount", "Amount")}</span></div>}
       <div className="ph-list" role="list">
         {list.length === 0 ? <p className="w-sub ph-empty">Nothing here for this filter.</p> : shown.map((r) => {
           const tone = PH_TONE[String(r.outcome)] ?? "muted"; const date = new Date(r.t).toLocaleDateString("en-US", { month: "short", day: "numeric" });
           return <button key={String(r.id)} role="listitem" className={`ph-row ${narrow ? "narrow" : ""}`} onClick={() => open(r)} title="Open receipt">
             <span className="ph-thumb">{r.image ? <img src={String(r.image)} alt="" loading="lazy" /> : <i>{String(r.merchant || r.item || "?").charAt(0).toUpperCase()}</i>}</span>
-            <span className="ph-item"><b>{String(r.item)}</b><span>{narrow ? `${r.agent} · ${date}` : `${r.merchant || "—"} · ${r.mandate}`}</span></span>
-            {!narrow && <span className="ph-agent">{String(r.agent)}</span>}
+            <span className="ph-item"><b>{String(r.item)}</b><span>{narrow ? `${r.merchant || "—"} · ${date}` : String(r.mandate ?? "").split(" · ")[0]}</span></span>
+            {!narrow && <span className="ph-agent">{String(r.merchant || "—")}</span>}
             {!narrow && <span><span className={`ph-out ${tone}`}>{PH_LABEL[String(r.outcome)] ?? String(r.outcome)}</span></span>}
             {!narrow && <span className="ph-date">{date}</span>}
             <span className="ph-amt r"><b className={`num ${tone === "bad" ? "strike" : ""}`}>{money2(r.amount)}</b>{narrow && <span className={`ph-out ${tone}`}>{PH_LABEL[String(r.outcome)] ?? String(r.outcome)}</span>}</span>
@@ -343,13 +355,13 @@ export const consoleWidgets = createWidgets<any>({
       "Budget meter per spending mandate: map mandate = mandates.title, spent = sum(attempts.spentThisMonth) (or sum(attempts.spent) for all time), budget = max(mandates.budget), askAbove = max(mandates.askAbove)."),
     def("decision-flow", "How rules decided", "<path d='M4 12h5M9 12l5-6h6M9 12h11M9 12l5 6h6'/>", [["outcome", "Outcome", CAT], ["value", "Value", NUM]], DecisionFlow, [520, 260],
       "How agent payment attempts split: bought on its own (Allowed, Refunded), asked you first (Approved / Declined / Waiting), Blocked. Map outcome = attempts.outcome and value = sum(attempts.attempts) for counts, or sum(attempts.amount) for value."),
-    def("agent-cards", "Agent cards", "<circle cx='9' cy='9' r='3'/><path d='M3 19a6 6 0 0112 0M16 6h5M16 10h5M16 14h3'/>", [["agent", "Agent", CAT], ["outcome", "Outcome", CAT], ["count", "Attempts", NUM], ["spent", "Spent", NUM], ["amount", "Attempted", NUM]], AgentCards, [960, 240],
-      "One card per AI agent: spend, purchases, times it asked the person, blocks and stopped value. Map agent = attempts.agent, outcome = attempts.outcome, count = sum(attempts.attempts), spent = sum(attempts.spent), amount = sum(attempts.amount)."),
+    def("mandate-cards", "Mandate cards", "<path d='M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z'/>", [["mandate", "Mandate", CAT], ["outcome", "Outcome", CAT], ["count", "Attempts", NUM], ["spent", "Spent", NUM], ["amount", "Attempted", NUM]], MandateCards, [960, 280],
+      "One card per active spending mandate: its budget, ask-above limit, categories and end date, plus what the agent spent, bought, asked and was blocked on. Map mandate = attempts.mandate, outcome = attempts.outcome, count = sum(attempts.attempts), spent = sum(attempts.spent), amount = sum(attempts.amount)."),
     def("purchase-history", "Purchase history", "<path d='M4 6h16M4 12h16M4 18h10'/>", PH_SLOTS.map((k) => [k, k, k === "amount" ? NUM : CAT, ["id", "item", "outcome", "amount"].includes(k)] as [string, string, string[], boolean]), PurchaseHistory, [960, 420],
-      "Every purchase an agent made or tried, newest first, with outcome filters (bought, approved by you, declined by you, blocked, refunded) and sorting by date or amount; clicking a row opens its receipt. Map each slot to the attempts field of the same name, with amount = sum(attempts.amount)."),
+      "Every purchase the agent made or tried, newest first, with outcome filters (bought, approved by you, declined by you, blocked, refunded) and sorting by date or amount; clicking a row opens its receipt. Map each slot to the attempts field of the same name, with amount = sum(attempts.amount)."),
     def("rule-list", "Which rule decided", "<path d='M5 6h14M5 12h10M5 18h6'/>", [["rule", "Rule", CAT], ["count", "Attempts", NUM]], RuleList, [400, 300],
       "Mandate rules ranked by how many attempts they decided, with a plain-language explanation of each. Map rule = attempts.rule, count = sum(attempts.attempts)."),
   ],
   // Mandate widgets first, then every built-in group (a custom menu replaces the default one).
-  menu: [{ label: "Mandate", widgetIds: ["spend-summary", "spend-trend", "spend-breakdown", "mandate-meter", "decision-flow", "agent-cards", "rule-list", "purchase-history"] }, ..._WIDGET_MENU],
+  menu: [{ label: "Mandate", widgetIds: ["spend-summary", "spend-trend", "spend-breakdown", "mandate-meter", "decision-flow", "mandate-cards", "rule-list", "purchase-history"] }, ..._WIDGET_MENU],
 } as any);

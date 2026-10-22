@@ -26,8 +26,8 @@ const proposeChange = tool("propose_mandate_change",
   async (a) => JSON.stringify({ status: "draft_for_review", note: "Shown to the person; nothing changed. They re-sign the mandate in Mandate to apply it.", ...a }));
 
 const STARTERS = [
-  { label: "Audit my mandates", prompt: "Audit my mandates: where are agents getting blocked or needing approval most, and should any rule change?" },
-  { label: "Blocked by agent", prompt: "Add a chart of blocked attempts by agent and rule." },
+  { label: "Audit my mandates", prompt: "Audit my mandates: where is the agent getting blocked or needing approval most, and should any rule change?" },
+  { label: "Blocked by mandate", prompt: "Add a chart of blocked attempts by mandate and rule." },
   { label: "Live activity only", prompt: "Filter this page to Live activity and summarise what happened." },
 ];
 

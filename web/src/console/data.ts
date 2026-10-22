@@ -12,7 +12,7 @@ export function buildStudioData(d: ConsoleData): AgDataSourcesDefinition {
   const days = d.attempts.map((a) => a.day).sort(); const today = d.asOf.slice(0, 10);
   return {
     description:
-      "Payment attempts made by AI shopping agents under signed PayPal spending mandates (Mandate app). " +
+      "Payment attempts made by the Mandate shopping agent (Claude) under signed PayPal spending mandates (Mandate app). " +
       "Every attempt was checked by a deterministic policy engine: Allowed (charged to the person's saved PayPal), Approved by you / Declined by you / Waiting for you (needed the person's tap), Blocked (no money moved), Refunded (person pressed undo). " +
       "Rows with source = Simulated are a twelve-week simulated history produced by running the real policy engine; rows with source = Live are real PayPal sandbox activity. Amounts are USD.",
     sources: [
@@ -28,7 +28,7 @@ export function buildStudioData(d: ConsoleData): AgDataSourcesDefinition {
         ]),
       },
       {
-        id: "mandates", description: "Signed intent mandates: what each agent was allowed to do.", data: d.mandates,
+        id: "mandates", description: "Signed intent mandates: what the agent was allowed to do.", data: d.mandates,
         fields: fields([["id", "Mandate ID", "textFormat", true], ["title", "Mandate", "textFormat"], ["summary", "Mandate wording", "textFormat"], ["budget", "Budget", "currencyFormat"], ["period", "Period", "textFormat"], ["askAbove", "Ask above", "currencyFormat"], ["status", "Status", "textFormat"], ["source", "Mandate source", "textFormat"]]),
       },
     ],

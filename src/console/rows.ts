@@ -11,7 +11,7 @@ export interface AttemptRow {
   decision: "allow" | "needs_approval" | "deny"; rule: string; reason: string; rationale: string; paypalOrderId: string;
   /** Short mandate name for filters and labels, e.g. "Coffee · $60/mo". */ mandate: string; /** "$9.00" for grids. */ amountText?: string; image?: string; shipTo?: string;
 }
-export interface MandateRow { id: string; title: string; summary: string; budget: number; period: string; askAbove: number; status: string; source: "Live" | "Simulated" }
+export interface MandateRow { id: string; title: string; summary: string; budget: number; period: string; askAbove: number; status: string; source: "Live" | "Simulated"; /** "Coffee, Kitchen" */ categories: string; expiresAt: string }
 
 const PER: Record<string, string> = { month: "/mo", week: "/wk", once: " total" };
 const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
@@ -26,7 +26,7 @@ const RULE_LABEL: Record<string, string> = {
   merchant: "Shop not allowed", per_purchase_max: "Over per-purchase max", agent: "Agent not allowed", expired: "Mandate expired", revoked: "Mandate revoked", signature: "Bad signature", approval: "Your approval",
 };
 export const ruleLabel = (r: string) => RULE_LABEL[r] ?? r;
-const agentName = (id: string) => (id.startsWith("mcp:") ? id.slice(4) : id === "mandate-claude-agent" ? "Shopping agent" : id);
+const agentName = (_id: string) => "Shopping agent";
 const usd = (c: number) => Math.round(c) / 100;
 function withThisMonth(rows: AttemptRow[], now = new Date()) { const m = now.toISOString().slice(0, 7); for (const r of rows) { r.spentThisMonth = r.at.slice(0, 7) === m ? r.spent : 0; r.amountText = `$${r.amount.toFixed(2)}`; } }
 
@@ -55,7 +55,7 @@ export function liveRows(svc: MandateService): { attempts: AttemptRow[]; mandate
       outcome: "Blocked", decision: "deny", rule: ruleLabel(e.rule), reason: e.reason, rationale: e.rationale, paypalOrderId: "" });
   }
   withThisMonth(attempts);
-  const mandates = [...svc.mandates.values()].map((m) => ({ id: m.id, title: titles.get(m.id)!, summary: m.summary, budget: Number(m.budget.amount), period: m.budget.period, askAbove: Number(m.approvalAbove), status: m.status, source: "Live" as const }));
+  const mandates = [...svc.mandates.values()].map((m) => ({ id: m.id, title: titles.get(m.id)!, summary: m.summary, budget: Number(m.budget.amount), period: m.budget.period, askAbove: Number(m.approvalAbove), status: m.status, source: "Live" as const, categories: m.categories.map(cap).join(", "), expiresAt: m.expiresAt }));
   return { attempts, mandates };
 }
 
@@ -69,20 +69,20 @@ type Sim = IntentMandate & { agentsList: string[]; products: SimProduct[]; rate:
 const SIM_SHIP: ShipTo = { name: "Jordan Lee", line1: "742 Maple Ave", city: "Portland", region: "OR", postalCode: "97205", country: "US" };
 const WHY = ["Running low, so it reordered the usual.", "Cheapest in-stock option across the shops it checked.", "Regular reorder: the last one was about three weeks ago.", "You asked for this in chat.", "On sale today, under your usual price."];
 
-/** The simulated household: five mandates, seven agents, everyday products. Shared by Spending and Orders. */
+/** The simulated household: five mandates, one shopping agent, everyday products. Shared by Spending and Orders. */
 function sims(created: string): Sim[] {
   const base = { userId: "sim", walletRef: "sim", currency: "USD", expiresAt: "2027-12-31T00:00:00Z", createdAt: created, status: "active", signature: "sim" } as const;
   return [
     { ...base, id: "sim_coffee", summary: "Coffee and kitchen supplies up to $150 a month, ask me above $25", budget: { amount: "150.00", period: "month" }, approvalAbove: "25.00", categories: ["coffee", "kitchen"], rate: 0.36,
-      agentsList: ["Shopping agent", "Claude Code"], products: [["Single-origin coffee beans, 1 lb", "18.00", "coffee", "Ridgeline Roasters"], ["Paper filters, 100 pack", "6.50", "coffee", "Ridgeline Roasters"], ["Oat milk, 6 pack", "21.00", "kitchen", "Corner Supply Co."], ["Burr grinder", "79.00", "coffee", "Ridgeline Roasters", 0.25], ["Gooseneck kettle", "34.00", "kitchen", "Corner Supply Co.", 0.4], ["Wireless headphones", "149.00", "electronics", "Volt Outlet", 0]] },
+      agentsList: ["Shopping agent"], products: [["Single-origin coffee beans, 1 lb", "18.00", "coffee", "Ridgeline Roasters"], ["Paper filters, 100 pack", "6.50", "coffee", "Ridgeline Roasters"], ["Oat milk, 6 pack", "21.00", "kitchen", "Corner Supply Co."], ["Burr grinder", "79.00", "coffee", "Ridgeline Roasters", 0.25], ["Gooseneck kettle", "34.00", "kitchen", "Corner Supply Co.", 0.4], ["Wireless headphones", "149.00", "electronics", "Volt Outlet", 0]] },
     { ...base, id: "sim_household", summary: "Household basics up to $150 a month from Corner Supply Co., ask me above $25", budget: { amount: "150.00", period: "month" }, approvalAbove: "25.00", categories: ["household"], merchants: ["Corner Supply Co."], rate: 0.34,
-      agentsList: ["Household bot", "Pantry planner"], products: [["Dish soap refill, 1 L", "9.00", "household", "Corner Supply Co."], ["Paper towels, 6 rolls", "14.00", "household", "Corner Supply Co."], ["Laundry pods, 42 ct", "19.00", "household", "Corner Supply Co."], ["Trash bags, 50 ct", "12.00", "household", "Corner Supply Co."], ["Cordless vacuum", "189.00", "household", "Corner Supply Co.", 0.05], ["Paper towels, 12 rolls", "22.00", "household", "QuickMart", 0]] },
+      agentsList: ["Shopping agent"], products: [["Dish soap refill, 1 L", "9.00", "household", "Corner Supply Co."], ["Paper towels, 6 rolls", "14.00", "household", "Corner Supply Co."], ["Laundry pods, 42 ct", "19.00", "household", "Corner Supply Co."], ["Trash bags, 50 ct", "12.00", "household", "Corner Supply Co."], ["Cordless vacuum", "189.00", "household", "Corner Supply Co.", 0.05], ["Paper towels, 12 rolls", "22.00", "household", "QuickMart", 0]] },
     { ...base, id: "sim_books", summary: "Books and audiobooks up to $60 a month, ask me above $25", budget: { amount: "60.00", period: "month" }, approvalAbove: "25.00", categories: ["books", "digital"], rate: 0.16,
-      agentsList: ["Reading list bot"], products: [["Paperback novel", "16.00", "books", "Pageturner Books"], ["E-book: field guide", "9.99", "digital", "Pageturner Books"], ["Audiobook credit", "14.95", "digital", "Pageturner Books"], ["Art book, hardcover", "65.00", "books", "Pageturner Books", 0.2]] },
+      agentsList: ["Shopping agent"], products: [["Paperback novel", "16.00", "books", "Pageturner Books"], ["E-book: field guide", "9.99", "digital", "Pageturner Books"], ["Audiobook credit", "14.95", "digital", "Pageturner Books"], ["Art book, hardcover", "65.00", "books", "Pageturner Books", 0.2]] },
     { ...base, id: "sim_gifts", summary: "Gifts up to $100 a month, ask me above $30", budget: { amount: "100.00", period: "month" }, approvalAbove: "30.00", categories: ["gifts"], rate: 0.1,
-      agentsList: ["Gift concierge"], products: [["Greeting card", "6.00", "gifts", "Bloom & Co."], ["Chocolate box", "22.00", "gifts", "Bloom & Co."], ["Candle set", "28.00", "gifts", "Bloom & Co."], ["Flower bouquet", "55.00", "gifts", "Bloom & Co.", 0.5]] },
+      agentsList: ["Shopping agent"], products: [["Greeting card", "6.00", "gifts", "Bloom & Co."], ["Chocolate box", "22.00", "gifts", "Bloom & Co."], ["Candle set", "28.00", "gifts", "Bloom & Co."], ["Flower bouquet", "55.00", "gifts", "Bloom & Co.", 0.5]] },
     { ...base, id: "sim_tech", summary: "Cables and small tech up to $80 a month, ask me above $20", budget: { amount: "80.00", period: "month" }, approvalAbove: "20.00", categories: ["electronics"], rate: 0.1,
-      agentsList: ["Cursor"], products: [["USB-C cable, 2 m", "12.00", "electronics", "Volt Outlet"], ["Wireless mouse", "24.00", "electronics", "Volt Outlet"], ["65 W charger", "29.00", "electronics", "Volt Outlet"], ["27-inch monitor", "249.00", "electronics", "Volt Outlet", 0.08]] },
+      agentsList: ["Shopping agent"], products: [["USB-C cable, 2 m", "12.00", "electronics", "Volt Outlet"], ["Wireless mouse", "24.00", "electronics", "Volt Outlet"], ["65 W charger", "29.00", "electronics", "Volt Outlet"], ["27-inch monitor", "249.00", "electronics", "Volt Outlet", 0.08]] },
   ] as Sim[];
 }
 
@@ -136,5 +136,5 @@ export function simulatedRows(now = new Date()): { attempts: AttemptRow[]; manda
     }
   }
   withThisMonth(attempts, now);
-  return { attempts, orders: orders.reverse(), mandates: all.map((m) => ({ id: m.id, title: mandateTitle(m), summary: m.summary, budget: Number(m.budget.amount), period: m.budget.period, askAbove: Number(m.approvalAbove), status: m.status, source: "Simulated" as const })) };
+  return { attempts, orders: orders.reverse(), mandates: all.map((m) => ({ id: m.id, title: mandateTitle(m), summary: m.summary, budget: Number(m.budget.amount), period: m.budget.period, askAbove: Number(m.approvalAbove), status: m.status, source: "Simulated" as const, categories: m.categories.map(cap).join(", "), expiresAt: m.expiresAt })) };
 }

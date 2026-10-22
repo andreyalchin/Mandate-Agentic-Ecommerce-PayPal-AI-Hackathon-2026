@@ -13,8 +13,7 @@ Prepared by Andrey Alchin.
 | Prompt injection | "Try a prompt injection" | Mandate check: Blocked; blocked row in Activity; no money moves |
 | Undo | Tap a receipt row, then Undo | Refund; row struck through; budget restored |
 | Revoke | Mandate card, Revoke then confirm | Status Revoked; composer disabled; "Create a new mandate" shown |
-| Outside agent | Outside agents, Connect an agent | Key, MCP URL, and claude mcp add command, each copyable once |
-| Spend console | Console tab | Overview and Agents pages; phone shows a single-column stack with no sideways page scroll |
+| Spend console | Console tab | Overview and Mandates pages; phone shows a single-column stack with no sideways page scroll |
 | Auditor | Console, Ask the auditor (desktop) | AI panel proposes a layout change as a draft |
 
 Breakpoints: three columns at 1240px and above, two columns at 900–1239px, a Chat / Activity / Mandate switcher below 900px.
@@ -31,11 +30,11 @@ On the Agent page, the button at the top of the mandate card opens the switcher.
 - `GET /api/receipts/:id/details` returns 404 for receipts owned by another session.
 
 ## Spending
-Tabs Overview / Agents. Filters: period (This month / 30 / 90 days / All time), mandate, and **Your data / Sample** (sample is a simulated household run through the real policy engine; no PayPal calls). **Ask AI about my spending** opens the AG Studio agent (desktop). Export CSV covers the filtered attempts.
+Tabs Overview / Mandates (a card per active mandate with its signed parameters, spend and outcomes; click for its purchases, bin icon revokes). Filters: period (This month / 30 / 90 days / All time), mandate, and **Your data / Sample** (sample is a simulated household run through the real policy engine; no PayPal calls). **Ask AI about my spending** opens the AG Studio agent (desktop). Export CSV covers the filtered attempts.
 
 ## Start over (multiple testers on one login)
 Data belongs to the browser session, never shared across testers. Account menu:
-- **Start fresh**: deletes this browser's mandates, orders, agent keys and history; PayPal stays linked.
+- **Start fresh**: deletes this browser's mandates, orders and history; PayPal stays linked.
 - **New tester**: same, and also unlinks PayPal and drops the session cookie, so the next person starts at setup.
 
 ## Setup v4 (value first, PayPal last)
@@ -44,14 +43,14 @@ Data belongs to the browser session, never shared across testers. Account menu:
 3. **Activate**: if PayPal is already linked, "Approve and activate"; otherwise the PayPal button links and activates in one go. The draft survives reloads (sessionStorage `mandate.setupDraft`).
 Drafting and previewing accept `walletRef: "pending"`; signing still requires a wallet you own.
 
-## Agents card + Add an agent
-The Agent page's Agents card lists the built-in Shopping agent and each connected outside agent. **Add an agent** opens a 3-step sheet: pick Claude Code / Claude Desktop / Cursor / Any MCP agent; copy the ready-made snippet (command or JSON config with the key filled in); the sheet waits and flips to "connected" the first time the agent uses its key. Remove cuts an agent off.
+## One agent
+There is a single built-in Claude shopping agent. Outside agents (MCP) were removed to keep the product simple; `/mcp` returns 404.
 
 ## Rules locked badge
 "Rules locked" opens a plain-language explainer; the Ed25519 fingerprint and public key link sit under "Technical details".
 
 ## Orders v4
-"Your orders / Sample" toggle (sample = 46 simulated orders from 7 agents, paid and refunded). Filters: status with counts, search (item, shop, agent), period, mandate, and agent chips with counts. Each row and receipt shows which agent bought it.
+"Your orders / Sample" toggle (sample = simulated orders, paid and refunded). Filters: status with counts, search (item, shop), period and mandate.
 
 ## Shop (catalog, stores, repeat list)
 Nav: Agent, Shop, Orders, Spending. `#/shop` has three tabs:

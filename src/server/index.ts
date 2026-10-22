@@ -7,7 +7,6 @@ import { createSdkClient, loadConfig, PayPalPayments, PayPalRest } from "../payp
 import { MandateService } from "../mandate/service.js";
 import { MandateSigner } from "../mandate/signing.js";
 import { WalletStore } from "./walletStore.js";
-import { AgentKeyStore } from "../mcp/agentKeys.js";
 import { attachPersistence, signingKeyPem } from "./persist.js";
 import { setWebCatalog } from "./catalog.js";
 import { Channel3 } from "../catalog/channel3.js";
@@ -16,14 +15,14 @@ import { claudeClassifier } from "../ai/classify.js";
 const cfg = loadConfig();
 const dataDir = process.env.DATA_DIR ?? "data";
 const pay = new PayPalPayments(createSdkClient(cfg));
-const wallets = new WalletStore(); const agentKeys = new AgentKeyStore();
+const wallets = new WalletStore();
 const mandates = new MandateService(pay, wallets, new MandateSigner(signingKeyPem(dataDir)));
-attachPersistence(dataDir, mandates, wallets, agentKeys);
+attachPersistence(dataDir, mandates, wallets);
 const claude = createClaude(); const llm = { client: claude, model: () => resolveModel(claude) };
 // Live product discovery through Channel3's MCP server (free tier works without a key).
 if (process.env.CHANNEL3 !== "off") setWebCatalog(new Channel3({ apiKey: process.env.CHANNEL3_API_KEY, classify: claudeClassifier(llm.client, llm.model) }));
 const app = createApp({
-  cfg, pay, wallets, mandates, agentKeys,
+  cfg, pay, wallets, mandates,
   rest: new PayPalRest(cfg),
   llm,
   onEvent: (e) => console.log(`[webhook] ${e.event_type} ${e.resource?.id ?? ""}`),

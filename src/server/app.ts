@@ -11,19 +11,17 @@ import { WalletStore } from "./walletStore.js";
 import { MandateService } from "../mandate/service.js";
 import { mandateRoutes, type Llm } from "./mandateRoutes.js";
 import { shopRoutes } from "./shopRoutes.js";
-import { mcpRoutes } from "../mcp/server.js";
 import { keyKind } from "../ai/claude.js";
 import { cookieOwner, ownership, type OwnerOf } from "./session.js";
 import { consoleRoutes } from "../console/studioLlm.js";
-import { AgentKeyStore } from "../mcp/agentKeys.js";
 
-export interface Deps { cfg: PayPalConfig; pay: PayPalPayments; rest: PayPalRest; wallets?: WalletStore; mandates?: MandateService; agentKeys?: AgentKeyStore; llm?: Llm; onEvent?: (e: any) => void | Promise<void>;
+export interface Deps { cfg: PayPalConfig; pay: PayPalPayments; rest: PayPalRest; wallets?: WalletStore; mandates?: MandateService; llm?: Llm; onEvent?: (e: any) => void | Promise<void>;
   /** Who is calling (default: anonymous session cookie). Tests pass a fixed owner. */ ownerOf?: OwnerOf;
   /** Raw order/refund routes for the developer harness. Off in production unless ENABLE_HARNESS=1. */ harness?: boolean }
 
 const Cart = z.object({ items: z.array(z.object({ sku: z.string().min(1), quantity: z.number().int().min(1).max(20) })).min(1) });
 
-export function createApp({ cfg, pay, rest, wallets = new WalletStore(), mandates, agentKeys = new AgentKeyStore(), llm, onEvent, ownerOf, harness = process.env.ENABLE_HARNESS === "1" || !!process.env.VITEST }: Deps) {
+export function createApp({ cfg, pay, rest, wallets = new WalletStore(), mandates, llm, onEvent, ownerOf, harness = process.env.ENABLE_HARNESS === "1" || !!process.env.VITEST }: Deps) {
   const svc = mandates ?? new MandateService(pay, wallets);
   const app = express();
   const inbox = new WebhookInbox();
@@ -58,11 +56,10 @@ export function createApp({ cfg, pay, rest, wallets = new WalletStore(), mandate
   }));
   if (harness) app.use(express.static(path.resolve("public")));
   else app.use(["/api/orders", "/api/refunds"], (_q, s) => { s.status(404).json({ error: "NOT_FOUND" }); });
-  app.use(ownership(ownerOf ?? cookieOwner(cfg.publicOrigin.startsWith("https://")), svc, wallets, agentKeys));
+  app.use(ownership(ownerOf ?? cookieOwner(cfg.publicOrigin.startsWith("https://")), svc, wallets));
 
   app.use(mandateRoutes(svc, cfg.publicOrigin, llm));
   app.use(shopRoutes(svc));
-  app.use(mcpRoutes(svc, agentKeys, cfg.publicOrigin));
   app.use(consoleRoutes(svc, llm));
 
   app.get("/api/health", (_req, res) => res.json({ ok: true, env: cfg.env }));
@@ -75,7 +72,7 @@ export function createApp({ cfg, pay, rest, wallets = new WalletStore(), mandate
    */
   app.post("/api/session/reset", (req, res) => {
     const mode = req.body?.mode === "new" ? "new" : "fresh"; const owner = req.owner!;
-    const ids = svc.purge(owner); agentKeys.purge(ids);
+    const ids = svc.purge(owner);
     let unlinked = 0;
     if (mode === "new") {
       for (const w of wallets.dump()) if (w.owner === owner) { wallets.delete(w.walletRef); unlinked++; }

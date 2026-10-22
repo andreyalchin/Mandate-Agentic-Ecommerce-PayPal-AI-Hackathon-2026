@@ -17,7 +17,7 @@ const overview: AgPageState = {
     where: { type: "spend-breakdown", dataMapping: { category: [f("attempts.category")], shop: [f("attempts.merchant")], spent: [sum("attempts.spent")] }, format: title("Where it went") } as any,
     meters: { type: "mandate-meter", dataMapping: { mandate: [f("mandates.title")], spent: [sum("attempts.spentThisMonth")], budget: [max("mandates.budget")], askAbove: [max("mandates.askAbove")] }, format: title("Budgets this month") } as any,
     flow: { type: "decision-flow", dataMapping: { outcome: [f("attempts.outcome")], value: [sum("attempts.attempts")] }, format: title("How your rules decided") } as any,
-    ledger: { type: "purchase-history", dataMapping: Object.fromEntries(["id", "at", "item", "merchant", "agent", "outcome", "image", "mandate", "mandateId", "rule", "reason", "rationale", "source"].map((k) => [k, [f(`attempts.${k}`)]]).concat([["amount", [f("attempts.amount")]]])), format: title("Purchase history", "Everything your agents bought or tried. Click a row for its receipt.") } as any,
+    ledger: { type: "purchase-history", dataMapping: Object.fromEntries(["id", "at", "item", "merchant", "outcome", "image", "mandate", "mandateId", "rule", "reason", "rationale", "source"].map((k) => [k, [f(`attempts.${k}`)]]).concat([["amount", [f("attempts.amount")]]])), format: title("Purchase history", "Everything your agent bought or tried. Click a row for its receipt.") } as any,
   },
   widgetLayout: {
     summary: at(0, 0, 24, 7),
@@ -30,9 +30,9 @@ const overview: AgPageState = {
 const agents: AgPageState = {
   id: "agents",
   widgets: {
-    cards: { type: "agent-cards", dataMapping: { agent: [f("attempts.agent")], outcome: [f("attempts.outcome")], count: [sum("attempts.attempts")], spent: [sum("attempts.spent")], amount: [sum("attempts.amount")] }, format: noTitle } as any,
+    cards: { type: "mandate-cards", dataMapping: { mandate: [f("attempts.mandate")], outcome: [f("attempts.outcome")], count: [sum("attempts.attempts")], spent: [sum("attempts.spent")], amount: [sum("attempts.amount")] }, format: noTitle } as any,
     rules: { type: "rule-list", dataMapping: { rule: [f("attempts.rule")], count: [sum("attempts.attempts")] }, format: title("Which rule decided") } as any,
-    activity: { type: "purchase-history", dataMapping: Object.fromEntries(["id", "at", "item", "merchant", "agent", "outcome", "image", "mandate", "mandateId", "rule", "reason", "rationale", "source"].map((k) => [k, [f(`attempts.${k}`)]]).concat([["amount", [f("attempts.amount")]]])), format: title("Purchase history by agent", "Click a row for its receipt.") } as any,
+    activity: { type: "purchase-history", dataMapping: Object.fromEntries(["id", "at", "item", "merchant", "outcome", "image", "mandate", "mandateId", "rule", "reason", "rationale", "source"].map((k) => [k, [f(`attempts.${k}`)]]).concat([["amount", [f("attempts.amount")]]])), format: title("Purchase history", "Click a row for its receipt.") } as any,
   },
   widgetLayout: { cards: at(0, 0, 24, 15), rules: at(0, 15, 9, 24), activity: at(9, 15, 15, 24) },
 };
@@ -47,10 +47,10 @@ const overviewDesk = (c: Counts): AgPageState => {
   const y3 = 8 + h2, y4 = y3 + h3;
   return { ...overview, widgetLayout: { summary: at(0, 0, 24, 8), trend: at(0, 8, 16, h2), where: at(16, 8, 8, h2), meters: at(0, y3, 12, h3), flow: at(12, y3, 12, h3), ledger: at(0, y4, 24, ledgerH(c)) } };
 };
-const agentsDesk = (c: Counts): AgPageState => { const perRow = typeof innerWidth === "number" && innerWidth >= 1380 ? 5 : innerWidth >= 1100 ? 4 : 3; const h = Math.ceil(Math.ceil(Math.max(1, c.agents) / perRow) * 14.6 + 2);
+const agentsDesk = (c: Counts): AgPageState => { const perRow = typeof innerWidth === "number" && innerWidth >= 1700 ? 4 : 3; const h = Math.ceil(Math.ceil(Math.max(1, c.agents) / perRow) * 20.4 + 2);
   const h2 = Math.max(ledgerH(c), Math.ceil(5 + Math.max(1, c.rules) * 3.6)); return { ...agents, widgetLayout: { cards: at(0, 0, 24, h), rules: at(0, h, 9, h2), activity: at(9, h, 15, h2) } }; };
 
-export const pageTitles: Record<string, string> = { overview: "Overview", agents: "Agents" };
+export const pageTitles: Record<string, string> = { overview: "Overview", agents: "Mandates" };
 
 /** Phones: AG Studio's canvas has no responsive mode, so stack every widget full width. */
 const stack = (page: AgPageState, order: [string, number][]): AgPageState => {
@@ -59,7 +59,7 @@ const stack = (page: AgPageState, order: [string, number][]): AgPageState => {
   return { ...page, widgetLayout };
 };
 const mobileOverview = (c: Counts) => stack(overview, [["summary", 14], ["trend", 17], ["where", 7 + Math.min(7, Math.max(1, c.groups)) * 3], ["meters", 5.5 + Math.max(1, c.mandates) * 6.4], ["flow", 17], ["ledger", ledgerH(c, true)]]);
-const mobileAgents = (c: Counts) => stack(agents, [["cards", 3.5 + Math.max(1, c.agents) * 13], ["rules", 5 + Math.max(1, c.rules) * 3.5], ["activity", ledgerH(c, true)]]);
+const mobileAgents = (c: Counts) => stack(agents, [["cards", 3.5 + Math.max(1, c.agents) * 18.4], ["rules", 5 + Math.max(1, c.rules) * 3.5], ["activity", ledgerH(c, true)]]);
 
 /** Canvas height in rows for a page, so the phone page can scroll naturally instead of inside a box. */
 export const pageRows = (p: AgPageState) => Math.max(...Object.values(p.widgetLayout ?? {}).map((l: any) => l.yTrack + l.ySpan));

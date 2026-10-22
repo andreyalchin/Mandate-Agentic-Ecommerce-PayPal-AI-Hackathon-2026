@@ -43,7 +43,7 @@ describe("spend console data", () => {
     expect(a.attempts.every((x) => x.source === "Simulated")).toBe(true);
     // Headphones are electronics: outside the coffee mandate, so the engine blocks them there.
     expect(a.attempts.filter((x) => x.category === "electronics" && x.mandateId === "sim_coffee").every((x) => x.outcome === "Blocked")).toBe(true);
-    expect(new Set(a.attempts.map((x) => x.agent)).size).toBeGreaterThanOrEqual(7);
+    expect(new Set(a.attempts.map((x) => x.agent))).toEqual(new Set(["Shopping agent"]));
   });
   it("sample orders are exactly the paid, approved and refunded attempts, with a ship-to", () => {
     const a = simulatedRows(new Date("2026-11-01T12:00:00Z"));
@@ -56,11 +56,11 @@ describe("spend console data", () => {
     const pay = fakePay(); const wallets = new WalletStore(); const w = wallets.save("V", undefined, undefined, "u1");
     const svc = new MandateService(pay, wallets);
     const m = svc.create({ userId: "u1", walletRef: w.walletRef, summary: "Coffee", budget: { amount: "60.00", period: "month" }, approvalAbove: "25.00", categories: ["coffee"], expiresAt: "2027-01-01T00:00:00Z" });
-    await svc.purchase(m.id, "mcp:Claude Code", [{ sku: "COF-FILTERS-100", name: "Filters", unitAmount: "6.50", quantity: 1, category: "coffee", merchant: "Ridgeline Roasters" }], "out");
+    await svc.purchase(m.id, "mandate-claude-agent", [{ sku: "COF-FILTERS-100", name: "Filters", unitAmount: "6.50", quantity: 1, category: "coffee", merchant: "Ridgeline Roasters" }], "out");
     const app = createApp({ ownerOf: () => "u1", cfg, pay, rest: new PayPalRest(cfg, (async () => new Response("{}")) as any), wallets, mandates: svc });
     const r = await request(app).get("/api/console/data");
     const live = r.body.attempts.filter((x: any) => x.source === "Live");
-    expect(live).toHaveLength(1); expect(live[0]).toMatchObject({ agent: "Claude Code", outcome: "Allowed", spent: 6.5 });
+    expect(live).toHaveLength(1); expect(live[0]).toMatchObject({ agent: "Shopping agent", outcome: "Allowed", spent: 6.5 });
     expect((await request(app).post("/api/studio/turn").send({ input: [] })).status).toBe(503);
   });
   it("never sends a conversation that ends on an assistant turn (Claude rejects prefill)", () => {

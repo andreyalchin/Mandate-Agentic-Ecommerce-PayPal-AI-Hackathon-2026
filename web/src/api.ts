@@ -41,4 +41,4 @@ export function mandateTitle(m: Pick<Mandate, "categories" | "budget">) {
 }
 export const shipLine = (s?: ShipTo) => (s ? [s.line1, [s.city, s.region].filter(Boolean).join(", "), s.postalCode].filter(Boolean).join(", ") : "");
 export const shortDate = (iso: string) => new Date(iso).toLocaleDateString([], { month: "short", day: "numeric" });
-export const agentLabel = (id: string) => (id.startsWith("mcp:") ? id.slice(4) : id === "mandate-claude-agent" ? "Shopping agent" : id);
+export const agentLabel = (_id: string) => "Shopping agent";

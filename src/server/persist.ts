@@ -3,7 +3,6 @@ import path from "node:path";
 import { generateKeyPairSync } from "node:crypto";
 import type { MandateService } from "../mandate/service.js";
 import type { WalletStore } from "./walletStore.js";
-import type { AgentKeyStore } from "../mcp/agentKeys.js";
 import { shelves } from "../catalog/shop.js";
 
 /**
@@ -19,12 +18,12 @@ export function signingKeyPem(dir: string): string {
   return fs.readFileSync(f, "utf8");
 }
 
-export function attachPersistence(dir: string, svc: MandateService, wallets: WalletStore, keys: AgentKeyStore, everyMs = 1500) {
+export function attachPersistence(dir: string, svc: MandateService, wallets: WalletStore, everyMs = 1500) {
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, "state.json");
   if (fs.existsSync(file)) {
     const s = JSON.parse(fs.readFileSync(file, "utf8"));
-    wallets.restore(s.wallets ?? []); keys.restore(s.agentKeys ?? []);
+    wallets.restore(s.wallets ?? []);
     for (const m of s.mandates ?? []) svc.mandates.set(m.id, m);
     for (const c of s.carts ?? []) svc.carts.set(c.id, c);
     for (const r of s.receipts ?? []) svc.receipts.set(r.id, r);
@@ -33,7 +32,7 @@ export function attachPersistence(dir: string, svc: MandateService, wallets: Wal
   }
   let last = "";
   const save = () => {
-    const snap = JSON.stringify({ v: 1, wallets: wallets.dump(), agentKeys: keys.dump(), mandates: [...svc.mandates.values()], carts: [...svc.carts.values()], receipts: [...svc.receipts.values()], log: svc.log.slice(-1000), shelves: shelves.dump().filter(([k]) => svc.mandates.has(k)) });
+    const snap = JSON.stringify({ v: 1, wallets: wallets.dump(), mandates: [...svc.mandates.values()], carts: [...svc.carts.values()], receipts: [...svc.receipts.values()], log: svc.log.slice(-1000), shelves: shelves.dump().filter(([k]) => svc.mandates.has(k)) });
     if (snap === last) return;
     const tmp = `${file}.tmp`; fs.writeFileSync(tmp, snap, { mode: 0o600 }); fs.renameSync(tmp, file); last = snap;
   };

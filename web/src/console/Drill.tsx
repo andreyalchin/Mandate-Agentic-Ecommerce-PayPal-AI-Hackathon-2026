@@ -63,7 +63,7 @@ export function DrillModal({ req, rows, onOpen, onClose, blocked }: { req: Drill
           {list.length === 0 ? <li className="dr-empty sm muted">Nothing here.</li> : list.map((a) => <li key={a.id}>
             <button className="dr-row" onClick={() => onOpen(a)} title="Open receipt">
               <span className="ph-thumb">{a.image ? <img src={a.image} alt="" loading="lazy" /> : <i>{(a.merchant || a.item || "?").charAt(0).toUpperCase()}</i>}</span>
-              <span className="ph-item"><b>{a.item}</b><span>{a.agent} · {a.merchant || "—"} · {day(a.at)}</span></span>
+              <span className="ph-item"><b>{a.item}</b><span>{a.merchant || "—"} · {day(a.at)}</span></span>
               <span className="ph-amt"><b className={`num ${TONE[a.outcome] === "bad" ? "strike" : ""}`}>{usd(a.amount)}</b><span className={`ph-out ${TONE[a.outcome] ?? "muted"}`}>{LABEL[a.outcome] ?? a.outcome}</span></span>
             </button></li>)}
         </ul>
