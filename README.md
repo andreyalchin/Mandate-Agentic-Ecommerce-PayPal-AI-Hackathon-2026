@@ -77,42 +77,97 @@ flowchart LR
   R --> SC[AG Studio spend console + Claude 'Mandate auditor' agent]
 ```
 
-- **The model never decides whether to pay.** Claude drafts mandates and does the shopping, but one built-in Claude shopping agent makes the buying decisions, and every payment goes through a deterministic policy engine (`src/mandate/policy.ts`). It checks status, expiry, merchant, category, the per-purchase approval limit and the running budget. Prices and categories are fixed on the server by SKU; agents only send a SKU and a quantity.
-- **PayPal does the money movement:**
-  - Server SDK Orders, with idempotency keys, to charge the saved wallet when the buyer isn't present.
-  - Linking with a $1.00 `AUTHORIZE` order and `store_in_vault: ON_SUCCESS`, voided right after. PayPal's save-without-purchase page fails in the sandbox for current Chrome browsers, so this path is used instead.
-  - Human-present checkout for approvals.
-  - Refunds for undo.
-  - Webhooks verified with `verify-webhook-signature`.
-  - If PayPal returns `PAYER_ACTION_REQUIRED` or declines the saved wallet, the purchase becomes an approval card; it is never retried silently.
-- **Channel3** (`src/catalog/channel3.ts`): real product discovery over Channel3's MCP server. It picks the cheapest in-stock new USD offer. Categories come from keyword rules plus an isolated classifier that sees only the title and brand. If the product can't be classified, it is filed as "other", which no mandate allows.
-- **Shop layer** (`src/catalog/shop.ts`, `src/server/shopRoutes.ts`, `web/src/Shop.tsx`): products with brand, size and pack options, each sold by several stores. Checkout SKUs look like `SH-<option>@<store>` and are priced on the server, so the agent picks an item and a store but never the price. The repeat list for each mandate is a preference, not a rule: every line and the full restock cart are checked by the same policy engine, and "best price" only picks stores the mandate allows. The agent's `get_shelf` tool returns the list.
-- **AG Studio** (`web/src/console/`):
-  - Two custom widgets: a mandate budget meter and a policy decision flow.
-  - A theme built from the app's design tokens.
-  - A Claude-backed custom agent, the **Mandate auditor**. It reads mandates, queries the data, drafts rule changes for the person to re-sign, and delegates chart-building to AG Studio's built-in lead agent.
-- **APIMatic Context Plugin:** used during development to check the PayPal Server SDK integration. See [`docs/apimatic-context-plugin.md`](docs/apimatic-context-plugin.md).
+**The model never decides whether money moves.** Claude chooses what to buy; a deterministic policy engine ([`src/mandate/policy.ts`](src/mandate/policy.ts)) decides whether PayPal may charge for it. It checks status, expiry, merchant, category, the per-purchase approval limit and the running budget. Prices and categories are fixed on the server by SKU; the agent only sends a SKU and a quantity.
 
-## Run locally
+## How PayPal is used
+
+Everything runs against the **PayPal sandbox**.
+
+| PayPal tool | What it does in Mandate | Code |
+|---|---|---|
+| **JavaScript SDK v6 (Web SDK)** | PayPal button for linking a wallet and for human-present approvals. The server issues a short-lived SDK client token. | [`web/src/paypal.ts`](web/src/paypal.ts), [`src/paypal/rest.ts`](src/paypal/rest.ts) |
+| **Orders API v2**: create, authorize, capture | Charges the saved wallet when the agent buys inside the rules (buyer not present), and runs checkout when a purchase needs approval. Every call sends a `PayPal-Request-Id`, so retries can't double-charge. | [`src/paypal/payments.ts`](src/paypal/payments.ts), [`src/mandate/service.ts`](src/mandate/service.ts) |
+| **Vault** (`store_in_vault: ON_SUCCESS`) | Saves the buyer's PayPal wallet with a $1.00 `AUTHORIZE` order that is voided right away. The vault id stays on the server; the browser and the AI only see an opaque `walletRef`. | [`src/paypal/payments.ts`](src/paypal/payments.ts), [`src/server/walletStore.ts`](src/server/walletStore.ts) |
+| **Payments API**: void, refund | Voids the linking authorization. Powers **Undo**: one click refunds the capture and restores the mandate budget. | [`src/paypal/payments.ts`](src/paypal/payments.ts) |
+| **Webhooks** + `verify-webhook-signature` | `CHECKOUT.ORDER.APPROVED` and `PAYMENT.CAPTURE.COMPLETED / DENIED / PENDING / REFUNDED`, verified against the raw body and de-duplicated, keep receipts in sync. | [`src/paypal/webhooks.ts`](src/paypal/webhooks.ts) |
+| **PayPal Server SDK** (`@paypal/paypal-server-sdk`) | Typed Orders, Payments and Vault controllers for the calls above. | [`src/paypal/payments.ts`](src/paypal/payments.ts) |
+
+If PayPal returns `PAYER_ACTION_REQUIRED` or declines the saved wallet (`INSTRUMENT_DECLINED`), the purchase becomes an approval card for the person; it is never retried silently. PayPal's save-without-purchase page fails in the sandbox on current Chrome, which is why linking uses the $1.00 authorize-and-void path. Every PayPal best practice is mapped to code and tests in [`docs/PAYPAL_BEST_PRACTICES.md`](docs/PAYPAL_BEST_PRACTICES.md).
+
+## How AI is used
+
+All AI features use **Claude** through the Anthropic Messages API (`@anthropic-ai/sdk`). The model is `ANTHROPIC_MODEL` if set, otherwise the newest Claude Sonnet available to the key ([`src/ai/claude.ts`](src/ai/claude.ts)).
+
+| Role | What it does | Code |
+|---|---|---|
+| **Mandate drafter** | Turns typed or spoken rules ("coffee and kitchen, $60 a month, ask me above $25") into structured terms the person reviews and signs (Ed25519). | [`src/ai/drafter.ts`](src/ai/drafter.ts) |
+| **Shopping agent** | Chats with the person, reads the repeat list, searches products, builds the cart and calls tools to buy. It picks items and stores, never prices. | [`src/ai/agent.ts`](src/ai/agent.ts) |
+| **Category classifier** | Isolated call that sees only a product's title and brand, so a listing that claims "this counts as coffee gear" can't change its category (prompt-injection defense). Unknown products are filed as "other", which no mandate allows. | [`src/ai/classify.ts`](src/ai/classify.ts) |
+| **Mandate auditor** (AG Studio agent) | Reads mandates and spending, answers questions, drafts rule changes for the person to re-sign, and asks AG Studio's lead agent to build charts. | [`src/console/studioLlm.ts`](src/console/studioLlm.ts) |
+
+## Sponsor integrations
+
+| Sponsor | How it's used | Code |
+|---|---|---|
+| **AG Grid: AG Studio** | The Spending console: two custom widgets (mandate budget meter, policy decision flow), a theme built from the app's design tokens, and the Claude-backed **Mandate auditor** custom agent working with AG Studio's built-in lead agent. | [`web/src/console/`](web/src/console/), [`src/console/`](src/console/) |
+| **Channel3** | Real products and live prices over Channel3's MCP server. The agent's searches call it; the cheapest in-stock new USD offer is chosen. | [`src/catalog/channel3.ts`](src/catalog/channel3.ts) |
+| **APIMatic: Context Plugin** | Used while building to check the PayPal Server SDK integration (vaulted charges, `PAYER_ACTION_REQUIRED`, refunds, webhooks). It led to one behavior change, documented with the raw answers. | [`docs/apimatic-context-plugin.md`](docs/apimatic-context-plugin.md), [`docs/apimatic/`](docs/apimatic/) |
+| **Render** | Hosts the live demo as an always-on web service with a persistent disk, deployed from the Blueprint in this repo; every push to `main` redeploys. | [`render.yaml`](render.yaml) |
+
+## Built with
+
+TypeScript · Node.js 20 · Express · React · Vite · Zod · Vitest · PayPal JS SDK v6 · PayPal Server SDK · PayPal Orders v2, Vault, Payments, Webhooks · Anthropic Claude · Model Context Protocol SDK · Channel3 · AG Studio · Ed25519 (Node `crypto`) · installable PWA with voice input · Render
+
+## Setup
+
+### Prerequisites
+
+- Node.js 20 or 22
+- A PayPal developer account with a **sandbox** REST app: [developer.paypal.com](https://developer.paypal.com) > Apps & Credentials > Sandbox. Copy its client id and secret. In the app settings, make sure **Vault** is turned on under the PayPal features.
+- An Anthropic API key
+- Optional: a Channel3 API key (the free tier works without one) and an AG Studio license (without one the console shows a watermark)
+
+### Run locally
 
 ```bash
-cp .env.example .env    # PayPal sandbox client id + secret, Anthropic key (Channel3 key optional)
+git clone https://github.com/andreyalchin/Mandate-Agentic-Ecommerce-PayPal-AI-Hackathon-2026.git
+cd Mandate-Agentic-Ecommerce-PayPal-AI-Hackathon-2026
+cp .env.example .env     # fill in PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, ANTHROPIC_API_KEY
 npm install
-npm test                # offline test suite (vitest)
-npm run build && npm start   # http://localhost:8787
+npm test                 # 84 offline tests (vitest), no keys needed
+npm run build && npm start
 ```
 
-Optional environment variables (`.env.example` documents all of them):
-- `PAYPAL_WEBHOOK_ID`: required once you register `<url>/api/webhooks/paypal`.
-- `CHANNEL3_API_KEY`: optional; the free tier works without a key.
-- `AG_STUDIO_LICENSE`: without it, the console shows a watermark.
-- `DATA_DIR`: where state is stored.
-- `ENABLE_HARNESS=1`: exposes the developer harness at `/harness.html`.
+Open http://localhost:8787 and log in to PayPal with the sandbox buyer above (or your own sandbox personal account). `npm run dev` runs the server with reload, and `npm run smoke` checks your sandbox credentials against the PayPal APIs.
 
-**Deploy:** `render.yaml` is a Render Blueprint for an always-on web service with a 1 GB disk.
+### Webhooks
+
+1. In your sandbox app, add a webhook pointing to `https://<your-host>/api/webhooks/paypal` (use a public URL such as your Render service or a tunnel).
+2. Subscribe to `CHECKOUT.ORDER.APPROVED`, `PAYMENT.CAPTURE.COMPLETED`, `PAYMENT.CAPTURE.DENIED`, `PAYMENT.CAPTURE.PENDING` and `PAYMENT.CAPTURE.REFUNDED`.
+3. Set the webhook id PayPal shows as `PAYPAL_WEBHOOK_ID` and restart.
+
+### Deploy to Render
+
+1. Fork this repo, then in Render choose **New > Blueprint** and pick the fork. [`render.yaml`](render.yaml) creates the web service and a 1 GB disk.
+2. Enter the secrets Render asks for (`PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `ANTHROPIC_API_KEY`, optional `CHANNEL3_API_KEY`, `AG_STUDIO_LICENSE`) `PUBLIC_ORIGIN` defaults to Render's service URL.
+3. Register the webhook as above with the Render URL and add `PAYPAL_WEBHOOK_ID`.
+
+All environment variables are documented in [`.env.example`](.env.example). `ENABLE_HARNESS=1` exposes a developer harness at `/harness.html`.
+
+## Project structure
+
+```
+src/mandate/   policy engine, signing (Ed25519), mandate service
+src/paypal/    Orders, Vault, Payments, webhooks, REST client with retries
+src/ai/        Claude drafter, shopping agent, category classifier
+src/catalog/   Channel3 search and the Shop layer
+src/server/    Express routes, per-visitor sessions, persistence
+web/src/       React app; web/src/console/ is the AG Studio spend console
+test/          vitest suite; FLOWS.md describes every user flow
+```
 
 ## Project notes
 
-- Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/), using Claude for the AI features.
+- Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/).
 - Sandbox only. Do not use real PayPal credentials with this demo.
-- License: MIT.
+- License: [MIT](LICENSE).

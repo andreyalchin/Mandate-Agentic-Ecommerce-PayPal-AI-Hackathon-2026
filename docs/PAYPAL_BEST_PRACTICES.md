@@ -14,9 +14,9 @@ Checklist from the official [PayPal AI Toolkit](https://github.com/paypal/AI-Too
 | `INSTRUMENT_DECLINED` → ask buyer to restart with another funding source | `isInstrumentDeclined`, 422 + `restart` | `routes.test.ts` |
 | Webhook signature verified against the raw body before parsing | `verifyWebhook`, raw route before `express.json()` | `routes.test.ts` webhooks |
 | Webhook idempotency (PayPal retries) and fast 200 ack | `WebhookInbox` | `routes.test.ts` "dedupes retries" |
-| v6 Web SDK: `clientId` for one-time payments, `clientToken` only for vaulting | `public/index.html` | manual sandbox run |
-| `findEligibleMethods` before rendering buttons | `public/index.html` | manual |
-| `session.start()` receives a Promise, not a function; no await before start | `public/index.html` | manual |
+| v6 Web SDK: `clientId` for one-time payments, `clientToken` only for vaulting | `web/src/paypal.ts` | manual sandbox run |
+| `findEligibleMethods` before rendering buttons | `web/src/paypal.ts` | manual |
+| `session.start()` receives a Promise, not a function; no await before start | `web/src/paypal.ts` | manual |
 | Vault ids stay server-side; clients get opaque `walletRef` | `src/server/walletStore.ts` | `routes.test.ts` "never returns the vault id" |
 | Negative testing via `PayPal-Mock-Response`, sandbox only | `mockOf()` in `app.ts` | `routes.test.ts` |
 | Secrets only in env; `.env.example` committed | `.env.example`, `.gitignore` | — |
