@@ -1,0 +1,194 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link href="https://api.fontshare.com/v2/css?f[]=switzer@400,500,600,700,800&display=swap" rel="stylesheet">
+<style>
+:root { --g: #1d4f3f; --g2: #0e2a21; --g3: #0a1f18; --mint: #b9e3cc; --paper: #f6f6f3; --ink: #141614; --ink2: #3b3f3c; --muted: #6b706c; --line: #e3e3dc; --ok: #1f7a52; --warn: #9a5a07; --bad: #b42318; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Switzer, Inter, system-ui, sans-serif; background: #ccc; -webkit-font-smoothing: antialiased; }
+.slide { width: 1600px; height: 900px; position: relative; overflow: hidden; background: var(--paper); color: var(--ink); margin-bottom: 40px; }
+.dark { background: radial-gradient(1200px 700px at 85% 15%, #1f5a47 0%, var(--g2) 55%, var(--g3) 100%); color: #fff; }
+.pad { position: absolute; inset: 72px 88px; }
+.brand { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 22px; letter-spacing: -.01em; }
+.mark { width: 34px; height: 34px; border-radius: 9px; background: var(--g); display: grid; place-items: center; }
+.dark .mark { background: #fff; } .dark .mark svg path { stroke: var(--g); }
+.eyebrow { font-size: 15px; font-weight: 650; letter-spacing: .14em; text-transform: uppercase; color: var(--g); }
+.dark .eyebrow { color: var(--mint); }
+h1 { font-size: 70px; line-height: 1.02; letter-spacing: -.035em; font-weight: 700; }
+h2 { font-size: 52px; line-height: 1.06; letter-spacing: -.03em; font-weight: 700; }
+.lead { font-size: 23px; line-height: 1.45; color: var(--ink2); }
+.dark .lead { color: rgba(255,255,255,.78); }
+.foot { position: absolute; left: 88px; right: 88px; bottom: 38px; display: flex; justify-content: space-between; font-size: 13.5px; color: var(--muted); }
+.dark .foot { color: rgba(255,255,255,.5); }
+.num { font-variant-numeric: tabular-nums; }
+.frame { border-radius: 16px; overflow: hidden; box-shadow: 0 40px 80px -30px rgba(10, 30, 22, .45), 0 0 0 1px rgba(0,0,0,.06); background: #fff; }
+.frame img { display: block; width: 100%; }
+.bar { height: 34px; background: #eeeeea; display: flex; align-items: center; gap: 7px; padding: 0 14px; }
+.bar i { width: 11px; height: 11px; border-radius: 50%; background: #d4d4cc; display: block; }
+.bar span { margin-left: 14px; height: 20px; flex: 0 0 340px; border-radius: 6px; background: #fff; font-size: 11.5px; color: #777; display: flex; align-items: center; padding: 0 10px; font-style: normal; }
+.phone { border-radius: 44px; padding: 10px; background: #0b0d0c; box-shadow: 0 40px 80px -24px rgba(0,0,0,.55); }
+.phone img { display: block; width: 100%; border-radius: 35px; }
+.pill { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 16px; border-radius: 99px; font-size: 15px; font-weight: 600; background: rgba(255,255,255,.1); color: #fff; border: 1px solid rgba(255,255,255,.16); }
+.pill.l { background: #fff; color: var(--ink2); border: 1px solid var(--line); }
+.card { background: #fff; border: 1px solid var(--line); border-radius: 20px; padding: 28px; }
+.k { font-size: 14px; font-weight: 650; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+</style></head><body>
+
+<!-- 1. Cover -->
+<section class="slide dark" id="s1">
+  <div class="pad">
+    <div class="brand"><span class="mark"><svg width="20" height="20" viewBox="0 0 32 32"><path d="M7 24V9l9 9 9-9v15" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Mandate</div>
+    <div style="position:absolute; top:150px; left:0; width:640px; display:grid; gap:28px;">
+      <p class="eyebrow">Agent payments on PayPal</p>
+      <h1>Let AI agents shop for your household.<br><span style="color:var(--mint)">Only within rules you sign.</span></h1>
+      <p class="lead" style="max-width:560px">Set a budget once. Agents find and buy what you need, ask before anything big, and every purchase can be undone.</p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:6px">
+        <span class="pill">Signed spending rules</span><span class="pill">One-tap approvals</span><span class="pill">Instant undo</span>
+      </div>
+    </div>
+    <div class="frame" style="position:absolute; left:690px; top:86px; width:900px;">
+      <div class="bar"><i></i><i></i><i></i><span>mandate-etwi.onrender.com</span></div>
+      <img src="shots/dash.png">
+    </div>
+    <div class="phone" style="position:absolute; left:1250px; top:300px; width:246px;"><img src="shots/phone-orders.png"></div>
+  </div>
+  <div class="foot"><span>Live on PayPal sandbox · Orders v2 · Vault · Refunds · Webhooks · mandate-etwi.onrender.com</span><span></span></div>
+</section>
+
+<!-- 2. Opportunity / problem -->
+<section class="slide" id="s2">
+  <div class="pad" style="display:grid; grid-template-columns: 1.05fr 1fr; gap:72px; align-items:center;">
+    <div style="display:grid; gap:26px">
+      <p class="eyebrow">The opportunity</p>
+      <h2>AI agents can already find anything. Nobody trusts them with the card.</h2>
+      <p class="lead">Agentic commerce is projected to orchestrate trillions in spending, but today it's all-or-nothing: hand an agent your card, or approve every click yourself.</p>
+      <div style="display:flex; gap:44px; margin-top:10px">
+        <div><p class="num" style="font-size:76px; font-weight:750; letter-spacing:-.04em; color:var(--g); line-height:1">$3–5T</p><p style="font-size:17px; color:var(--ink2); margin-top:8px">global agentic commerce<br>opportunity by 2030</p></div>
+        <div><p class="num" style="font-size:76px; font-weight:750; letter-spacing:-.04em; color:var(--g); line-height:1">$1T</p><p style="font-size:17px; color:var(--ink2); margin-top:8px">in US retail alone<br>by 2030</p></div>
+      </div>
+    </div>
+    <div style="display:grid; gap:18px">
+      <div class="card" style="display:grid; grid-template-columns:52px 1fr; gap:18px; align-items:start">
+        <span style="width:52px;height:52px;border-radius:14px;background:#fdecea;display:grid;place-items:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#b42318" stroke-width="2" stroke-linecap="round"><path d="M12 3v18M17 7.5c0-1.9-2.2-3-5-3s-5 1.3-5 3.3 2.2 2.7 5 3.2 5 1.3 5 3.3-2.2 3.2-5 3.2-5-1.1-5-3"/></svg></span>
+        <div><p style="font-size:22px;font-weight:650">Runaway spend</p><p style="font-size:17px;color:var(--muted);margin-top:6px;line-height:1.45">An agent with a stored card has no budget, no limit per purchase, and no off switch.</p></div>
+      </div>
+      <div class="card" style="display:grid; grid-template-columns:52px 1fr; gap:18px; align-items:start">
+        <span style="width:52px;height:52px;border-radius:14px;background:#fbf0dc;display:grid;place-items:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#9a5a07" stroke-width="2" stroke-linecap="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></span>
+        <div><p style="font-size:22px;font-weight:650">Prompt injection</p><p style="font-size:17px;color:var(--muted);margin-top:6px;line-height:1.45">"These $149 headphones count as coffee gear." A listing can talk an agent into almost anything.</p></div>
+      </div>
+      <div class="card" style="display:grid; grid-template-columns:52px 1fr; gap:18px; align-items:start">
+        <span style="width:52px;height:52px;border-radius:14px;background:#eef0ee;display:grid;place-items:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#3b3f3c" stroke-width="2" stroke-linecap="round"><path d="M6 3h9l4 4v14H6zM14 3v5h5M9 13h6M9 17h6"/></svg></span>
+        <div><p style="font-size:22px;font-weight:650">No audit trail</p><p style="font-size:17px;color:var(--muted);margin-top:6px;line-height:1.45">Which agent bought what, why it was allowed, and where it shipped is scattered or missing.</p></div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Source: McKinsey &amp; Company, "The agentic commerce opportunity: How AI agents are ushering in a new era for consumers and merchants"</span><span>Mandate</span></div>
+</section>
+
+<!-- 3. How it works -->
+<section class="slide" id="s3">
+  <div class="pad">
+    <p class="eyebrow">How it works</p>
+    <h2 style="margin-top:18px; max-width:1100px">One mandate. Any agent. PayPal moves money only when the rules say yes.</h2>
+    <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:28px; margin-top:52px">
+      <div style="display:grid; gap:16px; align-content:start">
+        <p style="display:flex;align-items:center;gap:12px;font-size:22px;font-weight:650"><span style="width:36px;height:36px;border-radius:50%;background:var(--g);color:#fff;display:grid;place-items:center;font-size:17px">1</span>Set the rules</p>
+        <p style="font-size:17px;color:var(--muted);line-height:1.45;min-height:50px">Pick a template or just say it. See exactly what the agent would buy before you sign.</p>
+        <div class="frame" style="height:400px"><img src="shots/preview.png" style="width:100%"></div>
+      </div>
+      <div style="display:grid; gap:16px; align-content:start">
+        <p style="display:flex;align-items:center;gap:12px;font-size:22px;font-weight:650"><span style="width:36px;height:36px;border-radius:50%;background:var(--g);color:#fff;display:grid;place-items:center;font-size:17px">2</span>Agents shop</p>
+        <p style="font-size:17px;color:var(--muted);line-height:1.45;min-height:50px">The built-in agent, or Claude Code, Cursor and any MCP agent, searches live products and picks the best.</p>
+        <div class="frame" style="height:400px; background:#fff; display:grid; align-items:center; padding:14px 6px"><img src="shots/chat.png" style="width:100%"></div>
+      </div>
+      <div style="display:grid; gap:16px; align-content:start">
+        <p style="display:flex;align-items:center;gap:12px;font-size:22px;font-weight:650"><span style="width:36px;height:36px;border-radius:50%;background:var(--g);color:#fff;display:grid;place-items:center;font-size:17px">3</span>PayPal pays, or asks you</p>
+        <p style="font-size:17px;color:var(--muted);line-height:1.45;min-height:50px">Inside the rules: paid from your vaulted PayPal wallet. Bigger: one tap. Outside: blocked.</p>
+        <div class="frame" style="height:400px"><img src="shots/receipt.png" style="width:100%"></div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Screens from the live product (PayPal sandbox)</span><span>Mandate</span></div>
+</section>
+
+<!-- 4. Trust / control -->
+<section class="slide dark" id="s4">
+  <div class="pad" style="display:grid; grid-template-columns: 1fr 1fr; gap:80px; align-items:center">
+    <div style="display:grid; gap:26px">
+      <p class="eyebrow">Control built in</p>
+      <h2>Every charge is checked before PayPal moves a cent.</h2>
+      <div style="display:grid; gap:14px; margin-top:8px">
+        <div style="display:flex;gap:16px;align-items:center;padding:18px 20px;border-radius:16px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12)"><span class="dot" style="background:#4fc28b;width:14px;height:14px"></span><div><p style="font-size:20px;font-weight:650">Inside the rules → paid automatically</p><p style="font-size:15.5px;color:rgba(255,255,255,.65);margin-top:3px">Vaulted PayPal wallet, receipt with the rule that allowed it.</p></div></div>
+        <div style="display:flex;gap:16px;align-items:center;padding:18px 20px;border-radius:16px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12)"><span class="dot" style="background:#e3a04a;width:14px;height:14px"></span><div><p style="font-size:20px;font-weight:650">Over your limit → one-tap approval</p><p style="font-size:15.5px;color:rgba(255,255,255,.65);margin-top:3px">Nothing is charged until you approve in PayPal.</p></div></div>
+        <div style="display:flex;gap:16px;align-items:center;padding:18px 20px;border-radius:16px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12)"><span class="dot" style="background:#ef6b5e;width:14px;height:14px"></span><div><p style="font-size:20px;font-weight:650">Outside the rules → blocked</p><p style="font-size:15.5px;color:rgba(255,255,255,.65);margin-top:3px">Prompt injection included. No money moves; the attempt is logged.</p></div></div>
+      </div>
+    </div>
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:18px">
+      <div style="padding:26px;border-radius:20px;background:#fff;color:var(--ink)"><p style="font-size:44px;font-weight:750;color:var(--g);letter-spacing:-.03em">Locked</p><p style="font-size:17px;font-weight:650;margin-top:8px">Signed rules</p><p style="font-size:15px;color:var(--muted);margin-top:6px;line-height:1.45">Ed25519 signature: no agent, shop or server can quietly change them.</p></div>
+      <div style="padding:26px;border-radius:20px;background:#fff;color:var(--ink)"><p style="font-size:44px;font-weight:750;color:var(--g);letter-spacing:-.03em">1 key</p><p style="font-size:17px;font-weight:650;margin-top:8px">per agent</p><p style="font-size:15px;color:var(--muted);margin-top:6px;line-height:1.45">Each MCP agent gets its own key, scoped to one mandate. Remove it anytime.</p></div>
+      <div style="padding:26px;border-radius:20px;background:#fff;color:var(--ink)"><p style="font-size:44px;font-weight:750;color:var(--g);letter-spacing:-.03em">Undo</p><p style="font-size:17px;font-weight:650;margin-top:8px">any purchase</p><p style="font-size:15px;color:var(--muted);margin-top:6px;line-height:1.45">Full refund through PayPal, and the budget comes back.</p></div>
+      <div style="padding:26px;border-radius:20px;background:#fff;color:var(--ink)"><p style="font-size:44px;font-weight:750;color:var(--g);letter-spacing:-.03em">0</p><p style="font-size:17px;font-weight:650;margin-top:8px">card numbers shared</p><p style="font-size:15px;color:var(--muted);margin-top:6px;line-height:1.45">Agents never see payment details; the vault id never reaches the browser.</p></div>
+    </div>
+  </div>
+  <div class="foot"><span>Policy engine runs server-side on every attempt, from any agent</span><span>Mandate</span></div>
+</section>
+
+<!-- 5. Insight -->
+<section class="slide" id="s5">
+  <div class="pad">
+    <div style="display:grid; gap:18px; max-width:1300px"><p class="eyebrow">Visibility</p><h2>Know what every agent bought, where it ships, and why it was allowed.</h2></div>
+    <div class="frame" style="position:absolute; left:0; top:230px; width:960px; height:530px">
+      <div class="bar"><i></i><i></i><i></i><span>Spending</span></div>
+      <img src="shots/spending.png">
+    </div>
+    <div class="frame" style="position:absolute; left:760px; top:300px; width:664px; height:460px">
+      <div class="bar"><i></i><i></i><i></i><span>Orders</span></div>
+      <img src="shots/orders.png" style="width:150%; margin-left:-4%">
+    </div>
+  </div>
+  <div class="foot"><span>Spend by agent · budgets · PayPal receipts · ask AI about your spending · AG Studio custom widgets · sample household shown</span><span>Mandate</span></div>
+</section>
+
+<!-- 6. Platform -->
+<section class="slide" id="s6">
+  <div class="pad">
+    <p class="eyebrow">The platform</p>
+    <h2 style="margin-top:18px; max-width:1200px">A trust layer that turns any AI agent into a safe PayPal checkout.</h2>
+    <div style="display:grid; grid-template-columns: 1fr 64px 1.15fr 64px 1fr; align-items:stretch; margin-top:44px">
+      <div class="card" style="display:grid; gap:14px; align-content:start">
+        <p class="k">Any agent</p>
+        <p style="font-size:20px; font-weight:650; line-height:1.3">Built-in shopping agent, Claude Code, Claude Desktop, Cursor, any MCP client</p>
+        <p style="font-size:16px; color:var(--muted); line-height:1.45">Connect over MCP with a per-mandate key, or chat in the app by voice or text.</p>
+      </div>
+      <div style="display:grid;place-items:center"><svg width="40" height="20" viewBox="0 0 40 20"><path d="M2 10h32M26 3l8 7-8 7" fill="none" stroke="#1d4f3f" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="card" style="display:grid; gap:14px; align-content:start; background:var(--g); color:#fff; border:0">
+        <p class="k" style="color:var(--mint)">Mandate</p>
+        <p style="font-size:20px; font-weight:650; line-height:1.3">Signed intent mandates and a policy engine on every attempt</p>
+        <ul style="list-style:none; display:grid; gap:9px; font-size:16px; color:rgba(255,255,255,.82)">
+          <li>· Budgets, ask-above limits, categories, shops, expiry</li><li>· One-tap approvals as cart mandates</li><li>· Receipts, refunds and a full audit log</li>
+        </ul>
+      </div>
+      <div style="display:grid;place-items:center"><svg width="40" height="20" viewBox="0 0 40 20"><path d="M2 10h32M26 3l8 7-8 7" fill="none" stroke="#1d4f3f" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="card" style="display:grid; gap:14px; align-content:start">
+        <p class="k">PayPal</p>
+        <p style="font-size:20px; font-weight:650; line-height:1.3">Vault, Orders v2, Refunds, Webhooks</p>
+        <p style="font-size:16px; color:var(--muted); line-height:1.45">Saved wallet for agent checkout, buyer approval in the PayPal window, refunds on Undo.</p>
+      </div>
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:30px; align-items:center">
+      <span class="k" style="margin-right:6px">Also inside</span>
+      <span class="pill l">Channel3 live product catalog</span><span class="pill l">Claude for drafting and shopping</span><span class="pill l">AG Studio dashboards</span><span class="pill l">PayPal Server SDK (APIMatic)</span><span class="pill l">Render</span><span class="pill l">Installable PWA with voice input</span>
+    </div>
+    <div style="margin-top:44px">
+      <p class="k">What's next</p>
+      <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:16px; margin-top:16px">
+        <div class="card" style="padding:22px"><p style="font-size:18px;font-weight:650">Family plans</p><p style="font-size:15px;color:var(--muted);margin-top:6px;line-height:1.45">Shared household budgets with a mandate per person or agent.</p></div>
+        <div class="card" style="padding:22px"><p style="font-size:18px;font-weight:650">Merchant verification</p><p style="font-size:15px;color:var(--muted);margin-top:6px;line-height:1.45">Shops check the signed mandate before they accept an agent's order.</p></div>
+        <div class="card" style="padding:22px"><p style="font-size:18px;font-weight:650">Native app, voice first</p><p style="font-size:15px;color:var(--muted);margin-top:6px;line-height:1.45">Speak a request; approve with Face ID from a push notification.</p></div>
+        <div class="card" style="padding:22px"><p style="font-size:18px;font-weight:650">Agent platforms</p><p style="font-size:15px;color:var(--muted);margin-top:6px;line-height:1.45">One API so any agent builder can offer safe PayPal checkout.</p></div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>MIT licensed · github.com/andreyalchin/paypal-ai-hackathon-2026</span><span>Mandate</span></div>
+</section>
+</body></html>
