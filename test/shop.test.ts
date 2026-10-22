@@ -44,8 +44,10 @@ describe("repeat list", () => {
     expect(r.suggested).toBe(true);
     expect(r.items.map((x: any) => x.variantId)).toEqual(["beans-house-16", "filters-brew-100", "oat-barista-6"]);
     expect(r.items.every((x: any) => x.verdict.decision === "allow")).toBe(true);
-    // 18.00 monthly + 5.99 every 60 days + 19.80 every 14 days
-    expect(r.monthlyCents).toBe(1800 + Math.round(599 / 2) + Math.round((1980 * 30) / 14));
+    // Oat milk is stretched from every 2 weeks to every month so the list fits 80% of the $60 budget.
+    expect(r.items.map((x: any) => x.every)).toEqual([30, 60, 30]);
+    expect(r.monthlyCents).toBe(1800 + Math.round(599 / 2) + 1980);
+    expect(r.monthlyCents).toBeLessThanOrEqual(4800);
     expect(r.budgetMonthlyCents).toBe(6000);
   });
   it("saves choices, honors a chosen store, and flags items outside the mandate", async () => {

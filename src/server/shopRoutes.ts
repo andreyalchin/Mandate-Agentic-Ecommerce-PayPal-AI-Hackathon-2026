@@ -18,9 +18,21 @@ const verdict = (svc: MandateService, m: IntentMandate, sku: string, quantity: n
 /** Budget expressed per month so a repeat list can be compared with it. */
 const monthlyBudgetCents = (m: IntentMandate) => { const c = Math.round(Number(m.budget.amount) * 100); return m.budget.period === "month" ? c : m.budget.period === "week" ? Math.round((c * 52) / 12) : null; };
 
+/** Suggestions should leave room for one-offs: stretch the priciest item's cadence, then drop items, until it fits 80% of the budget. */
+function fitToBudget(items: ShelfItem[], m: IntentMandate) {
+  const cap = monthlyBudgetCents(m); if (cap == null) return items;
+  const cost = (it: ShelfItem) => { const h = findVariant(it.variantId); return h ? (Math.round(Number(bestOffer(h.v, m.merchants).price) * 100) * it.qty * 30) / it.every : 0; };
+  const out = items.map((x) => ({ ...x })); const steps = [...Cadences];
+  while (out.length && out.reduce((a, x) => a + cost(x), 0) > cap * 0.8) {
+    const top = [...out].sort((a, b) => cost(b) - cost(a)).find((x) => x.every < 90);
+    if (top) top.every = steps[steps.indexOf(top.every as (typeof steps)[number]) + 1] ?? 90; else out.splice(out.indexOf([...out].sort((a, b) => cost(b) - cost(a))[0]), 1);
+  }
+  return out;
+}
+
 /** The repeat list with the store, price and mandate decision for every line, plus the monthly estimate. */
 export function shelfView(svc: MandateService, m: IntentMandate) {
-  const saved = shelves.get(m.id); const raw: ShelfItem[] = saved ?? suggestedShelf(m.categories);
+  const saved = shelves.get(m.id); const raw: ShelfItem[] = saved ?? fitToBudget(suggestedShelf(m.categories), m);
   const items = raw.flatMap((it) => {
     const hit = findVariant(it.variantId); if (!hit) return [];
     const { p, v } = hit; const best = bestOffer(v, m.merchants);
