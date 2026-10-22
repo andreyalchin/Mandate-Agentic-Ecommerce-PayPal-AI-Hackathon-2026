@@ -27,7 +27,8 @@ const TEMPLATES: Template[] = [
 ];
 
 const PERIOD_WORD: Record<MandateInput["budget"]["period"], string> = { week: "a week", month: "a month", once: "in total" };
-const ENDS = [{ id: "1", label: "1 month", months: 1 }, { id: "3", label: "3 months", months: 3 }, { id: "12", label: "1 year", months: 12 }];
+const monthsOf = (ends: string) => Math.min(24, Math.max(1, Math.round(Number(ends)) || 3));
+const monthsLabel = (n: number) => (n === 12 ? "1 year" : n === 24 ? "2 years" : `${n} month${n === 1 ? "" : "s"}`);
 const inMonths = (n: number) => { const d = new Date(); d.setMonth(d.getMonth() + n); d.setHours(23, 59, 0, 0); return d.toISOString(); };
 const list = (xs: string[]) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
 /** The sentence the person signs, regenerated from the fields so it always matches the rules. */
@@ -51,12 +52,32 @@ function Steps({ at, go }: { at: 1 | 2 | 3; go: (s: 1 | 2 | 3) => void }) {
     </li>); })}</ol>;
 }
 
-function Presets({ label, value, options, onChange, suffix }: { label: string; value: string; options: number[]; onChange: (v: string) => void; suffix?: string }) {
-  const custom = !options.includes(Number(value));
+/** Big editable amount, a slider to drag, and quick picks. The number you see is the number that's saved. */
+function AmountPicker({ label, value, onChange, quick, max, step = 5, after }: { label: string; value: string; onChange: (v: string) => void; quick: number[]; max: number; step?: number; after?: ReactNode }) {
+  const n = Number(value) || 0; const top = Math.max(max, n); const pct = Math.min(100, (n / top) * 100);
   return (
-    <div className="presets" role="group" aria-label={label}>
-      {options.map((o) => <button key={o} type="button" className={`pchip ${Number(value) === o ? "on" : ""}`} aria-pressed={Number(value) === o} onClick={() => onChange(String(o))}>${o}</button>)}
-      <span className={`money-in pchip-in ${custom ? "on" : ""}`}>$<input aria-label={`${label}, custom amount`} inputMode="decimal" value={value} onChange={(e) => onChange(e.target.value.replace(/[^\d.]/g, ""))} />{suffix && <span className="muted">{suffix}</span>}</span>
+    <div className="amt-pick">
+      <div className="amt-row">
+        <label className="amt-big"><span className="amt-cur">$</span>
+          <input aria-label={label} inputMode="decimal" value={value} style={{ width: `${Math.max(2, value.length) + 0.4}ch` }} onFocus={(e) => e.currentTarget.select()} onChange={(e) => onChange(e.target.value.replace(/[^\d.]/g, "").slice(0, 7))} />
+          <span className="amt-edit" aria-hidden>{Icon.pencil(14)}</span>
+        </label>
+        {after}
+      </div>
+      <input type="range" className="range" aria-label={`${label} slider`} min={step} max={top} step={step} value={Math.min(n, top)} style={{ ["--f" as any]: pct / 100 }} onChange={(e) => onChange(e.target.value)} />
+      <div className="amt-quick" role="group" aria-label={`${label} quick picks`}>{quick.map((o) => <button key={o} type="button" className={`qchip ${n === o ? "on" : ""}`} aria-pressed={n === o} onClick={() => onChange(String(o))}>${o}</button>)}</div>
+    </div>
+  );
+}
+
+/** Drag to choose how long the mandate lasts, 1 to 24 months. */
+function Duration({ ends, setEnds }: { ends: string; setEnds: (v: string) => void }) {
+  const m = monthsOf(ends); const pct = ((m - 1) / 23) * 100;
+  return (
+    <div className="dur">
+      <p className="dur-v"><b>{monthsLabel(m)}</b><span className="muted"> · until {dateOf(inMonths(m))}</span></p>
+      <input type="range" className="range" min={1} max={24} step={1} value={m} aria-label="Ends after, in months" aria-valuetext={monthsLabel(m)} style={{ ["--f" as any]: pct / 100 }} onChange={(e) => setEnds(e.target.value)} />
+      <div className="dur-ticks" aria-hidden>{[1, 6, 12, 18, 24].map((t) => <button key={t} type="button" tabIndex={-1} style={{ left: `${((t - 1) / 23) * 100}%` }} className={m === t ? "on" : ""} onClick={() => setEnds(String(t))}>{t === 12 ? "1 yr" : t === 24 ? "2 yrs" : `${t} mo`}</button>)}</div>
     </div>
   );
 }
@@ -117,7 +138,7 @@ export function Setup({ wallet, onWallet, onSigned, onCancel }: { wallet: Wallet
     if (!draft) return;
     setBusy("sign"); setErr(null);
     try {
-      const m = await api<Mandate>("/api/mandates", { ...draft, walletRef: ref, expiresAt: inMonths(ENDS.find((e) => e.id === ends)!.months) });
+      const m = await api<Mandate>("/api/mandates", { ...draft, walletRef: ref, expiresAt: inMonths(monthsOf(ends)) });
       sessionStorage.removeItem(KEY); onSigned(m);
     } catch (e: any) { setErr(e.message ?? "Couldn't activate. Try again."); setBusy(null); }
   }
@@ -165,12 +186,12 @@ export function Setup({ wallet, onWallet, onSigned, onCancel }: { wallet: Wallet
           <section className="card step-card" aria-label="Limits">
             <div className="field-g">
               <h3>How much can it spend?</h3>
-              <Presets label="Budget" value={draft.budget.amount} options={[25, 50, 100, 200]} onChange={(v) => set({ budget: { ...draft.budget, amount: v } })} />
-              <div className="seg sm" role="radiogroup" aria-label="Budget period">{(["week", "month", "once"] as const).map((p) => <button key={p} role="radio" aria-checked={draft.budget.period === p} className={draft.budget.period === p ? "on" : ""} onClick={() => set({ budget: { ...draft.budget, period: p } })}>{p === "week" ? "Per week" : p === "month" ? "Per month" : "One-time"}</button>)}</div>
+              <AmountPicker label="Budget" value={draft.budget.amount} quick={[25, 50, 100, 200, 500]} max={500} onChange={(v) => set({ budget: { ...draft.budget, amount: v } })}
+                after={<div className="seg sm" role="radiogroup" aria-label="Budget period">{(["week", "month", "once"] as const).map((p) => <button key={p} role="radio" aria-checked={draft.budget.period === p} className={draft.budget.period === p ? "on" : ""} onClick={() => set({ budget: { ...draft.budget, period: p } })}>{p === "week" ? "Per week" : p === "month" ? "Per month" : "One-time"}</button>)}</div>} />
             </div>
             <div className="field-g">
               <h3>Ask me before buying anything over</h3>
-              <Presets label="Ask above" value={draft.approvalAbove} options={[10, 25, 50]} onChange={(v) => set({ approvalAbove: v })} />
+              <AmountPicker label="Ask above" value={draft.approvalAbove} quick={[10, 25, 50, 100]} max={Math.max(25, Number(draft.budget.amount) || 100)} onChange={(v) => set({ approvalAbove: v })} />
               <p className="xs muted">You'll get a one-tap approval. Nothing is charged until you say yes.</p>
             </div>
             <div className="field-g">
@@ -180,7 +201,7 @@ export function Setup({ wallet, onWallet, onSigned, onCancel }: { wallet: Wallet
             </div>
             <div className="field-g">
               <h3>Ends after</h3>
-              <div className="seg sm" role="radiogroup" aria-label="Ends after">{ENDS.map((e) => <button key={e.id} role="radio" aria-checked={ends === e.id} className={ends === e.id ? "on" : ""} onClick={() => setEnds(e.id)}>{e.label}</button>)}</div>
+              <Duration ends={ends} setEnds={setEnds} />
             </div>
             {questions.length > 0 && <div className="questions"><p className="eyebrow">{Icon.spark(12)} Worth a look</p><ul>{questions.map((q, i) => <li key={i}>{q}</li>)}</ul></div>}
           </section>
@@ -203,7 +224,7 @@ export function Setup({ wallet, onWallet, onSigned, onCancel }: { wallet: Wallet
           <div className="recap">
             <p className="eyebrow">You're approving</p>
             <p id="s3" className="statement">“{draft.summary}”</p>
-            <div className="recap-chips"><span>{amt(draft.budget.amount)} {per(draft.budget.period)}</span><span>asks over {amt(draft.approvalAbove)}</span><span>ends {dateOf(inMonths(ENDS.find((e) => e.id === ends)!.months))}</span><button className="link" onClick={() => setStep(2)}>Edit</button></div>
+            <div className="recap-chips"><span>{amt(draft.budget.amount)} {per(draft.budget.period)}</span><span>asks over {amt(draft.approvalAbove)}</span><span>ends {dateOf(inMonths(monthsOf(ends)))}</span><button className="link" onClick={() => setStep(2)}>Edit</button></div>
           </div>
           {wallet ? <>
             <div className="linked">{Icon.check(14)} Pays with {wallet.label || "your PayPal account"}</div>

@@ -10,6 +10,7 @@ import { aiToolDisplay } from "./toolDisplay";
 import { Icon, Spinner } from "../ui";
 import { api, mandateTitle, type Mandate } from "../api";
 import { AttemptModal, type AttemptLite } from "../Receipt";
+import { DrillModal, type DrillReq } from "./Drill";
 import "./console.css";
 
 type Period = "month" | "30" | "90" | "all";
@@ -44,7 +45,7 @@ export default function ConsolePage({ licenseKey, mandates = [], onChanged }: { 
     }).catch(() => setErr("Couldn't load spending data."));
   useEffect(() => { loadData(); }, []);
   // Purchase history rows open a receipt; agent cards ask to remove an agent (both dispatched from AG Studio widgets).
-  const [attempt, setAttempt] = useState<AttemptLite | null>(null);
+  const [attempt, setAttempt] = useState<AttemptLite | null>(null); const [drill, setDrill] = useState<DrillReq | null>(null);
   const [removal, setRemoval] = useState<Removal | null>(null); const [rmBusy, setRmBusy] = useState(false); const [toast, setToast] = useState<string | null>(null);
   const [hidden, setHidden] = useState<Set<string>>(() => new Set(JSON.parse(sessionStorage.getItem("mandate.hiddenSampleAgents") ?? "[]")));
   useEffect(() => { sessionStorage.setItem("mandate.hiddenSampleAgents", JSON.stringify([...hidden])); }, [hidden]);
@@ -68,8 +69,9 @@ export default function ConsolePage({ licenseKey, mandates = [], onChanged }: { 
       const keys = (await Promise.all(active.map((m) => api<{ id: string; agentName: string; revoked?: boolean }[]>(`/api/mandates/${m.id}/agent-keys`).then((ks) => ks.filter((k) => !k.revoked && k.agentName === name).map((k) => ({ id: m.id, title: mandateTitle(m), keyId: k.id }))).catch(() => [])))).flat();
       setRemoval({ name, kind: "key", mandates: keys });
     };
-    addEventListener("mandate:attempt", onAttempt); addEventListener("mandate:remove-agent", onRemove);
-    return () => { removeEventListener("mandate:attempt", onAttempt); removeEventListener("mandate:remove-agent", onRemove); };
+    const onDrill = (e: Event) => setDrill((e as CustomEvent).detail as DrillReq);
+    addEventListener("mandate:attempt", onAttempt); addEventListener("mandate:remove-agent", onRemove); addEventListener("mandate:drill", onDrill);
+    return () => { removeEventListener("mandate:attempt", onAttempt); removeEventListener("mandate:remove-agent", onRemove); removeEventListener("mandate:drill", onDrill); };
   }, []);
   async function confirmRemove(redo = false) {
     if (!removal) return; setRmBusy(true);
@@ -146,7 +148,7 @@ export default function ConsolePage({ licenseKey, mandates = [], onChanged }: { 
             <p className="muted sm">{src === "mine" ? "Ask your agent to buy something and it shows up here with the rule that decided it." : "Try a longer period."}</p>
             <div className="row">{src === "mine" && <a className="btn sm primary" href="#/">Ask your agent</a>}<button className="btn sm" onClick={() => { setSource("sample"); setPeriod("90"); }}>Preview a sample household</button></div>
           </section>
-        : <div className={`studio-host ${phone ? "phone" : ""}`} style={phone ? { height: rows * 18 + 32 } : undefined}>
+        : <div className={`studio-host ${phone ? "phone" : ""}`} style={phone || mode === "view" ? { height: rows * 18 + 32, minHeight: 0 } : undefined}>
             <AgStudioProvider licenseKey={licenseKey} modules={[AgStudioAiModule]}>
               <AgStudio key={studioKey} style={{ height: "100%", width: "100%" }} theme={mandateTheme} layout={{ widgetBorderEnabled: true }}
                 panels={{ edit: { left: ["data"], right: ["ai", "edit", "filters"] }, view: { right: [] } }} data={studioData} widgets={consoleWidgets} ai={ai} aiToolDisplay={aiToolDisplay} initialState={report} mode={mode}
@@ -154,6 +156,7 @@ export default function ConsolePage({ licenseKey, mandates = [], onChanged }: { 
             </AgStudioProvider>
           </div>}
       {src === "sample" && hidden.size > 0 && page === "agents" && <p className="xs muted center restore">{hidden.size} sample agent{hidden.size === 1 ? "" : "s"} removed. <button className="link" onClick={() => setHidden(new Set())}>Bring them back</button></p>}
+      {drill && view && <DrillModal req={drill} rows={view.attempts as any} blocked={!!attempt} onOpen={(a) => setAttempt(a)} onClose={() => setDrill(null)} />}
       {attempt && <AttemptModal a={attempt} onClose={() => setAttempt(null)} onChanged={() => { loadData(); onChanged?.(); }} />}
       {removal && <div className="modal-bg" onMouseDown={(e) => e.target === e.currentTarget && setRemoval(null)}>
         <div className="modal confirm card" role="alertdialog" aria-modal="true" aria-labelledby="rm-t">

@@ -40,7 +40,7 @@ The app runs in PayPal **sandbox**. Use this sandbox buyer account (sandbox mone
 | | |
 |---|---|
 | Email | `sb-kejwc53484103@personal.example.com` |
-| Password | `uRS6ZeS<` |
+| Password | `12345678` |
 
 The setup screen shows the same login with copy buttons, so you never have to come back here. Each browser gets its own private session, so your wallet, mandates and receipts are visible only to you.
 
@@ -114,6 +114,6 @@ Optional environment variables (`.env.example` documents all of them):
 
 ## Project notes
 
-- Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/) with Perplexity Computer, using Claude for the AI features.
+- Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/), using Claude for the AI features.
 - Sandbox only. Do not use real PayPal credentials with this demo.
 - License: MIT.

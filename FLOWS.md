@@ -1,6 +1,6 @@
 # Mandate: user flows (check after every UI change)
 
-Prepared by Andrey Alchin with Perplexity Computer.
+Prepared by Andrey Alchin.
 
 | Flow | Where | Expected |
 |---|---|---|

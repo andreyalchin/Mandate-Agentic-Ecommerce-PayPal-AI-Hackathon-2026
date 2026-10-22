@@ -158,3 +158,39 @@
 .w-agent:hover .w-agent-rm, .w-agent-rm:focus-visible { opacity: 1; }
 .w-agent-rm:hover { color: var(--bad); background: var(--surface); border-color: var(--line); }
 @media (hover: none) { .w-agent-rm { opacity: 1; } }
+
+/* One scroll per page: widgets are sized to their content, nothing scrolls inside them. */
+.ph-list, .w-break ul, .w-rules, .mw-meter { overflow: visible !important; }
+.w-ph { grid-template-rows: auto auto auto auto; }
+.ph-pager { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-top: 10px; }
+.ph-pg { height: 30px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font: inherit; font-size: 12.5px; font-weight: 600; color: var(--ink-2); cursor: pointer; }
+.ph-pg:hover:not(:disabled) { border-color: var(--line-strong); } .ph-pg:disabled { opacity: .4; cursor: default; }
+.ph-pager .row { gap: 6px; }
+
+/* Drill-down targets */
+.drillable { cursor: pointer; transition: background .15s, box-shadow .15s, border-color .15s; }
+.drillable:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.w-tile.drillable { border-radius: 10px; } .w-tile.drillable:hover { background: var(--surface-2); }
+.w-break li.drillable { border-radius: 8px; margin: -4px -6px; padding: 4px 6px; } .w-break li.drillable:hover { background: var(--surface-2); }
+.mw-group.drillable:hover, .w-rules li.drillable:hover { background: var(--surface-2); }
+.w-rules li.drillable { border-radius: 8px; margin: -5px -6px; padding: 5px 6px; }
+.w-agent.drillable:hover { box-shadow: inset 0 0 0 1px var(--line-strong); }
+.w-trend-plot .hit { cursor: pointer; }
+.w-tip em { font-style: normal; font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+/* Budgets this month: one clear card per budget */
+.mw-meter { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px !important; align-content: start; }
+.mw-card { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); min-width: 0; }
+.mw-card:hover { border-color: var(--line-strong); background: var(--surface-2); }
+.mw-card .mw-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.mw-card .mw-name { font-size: 14px; font-weight: 650; }
+.mw-left { font-size: 13px; font-weight: 650; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.mw-left.ok { color: var(--ok); } .mw-left.hot { color: var(--warn); } .mw-left.over { color: var(--bad); }
+.mw-card .mw-bar { position: relative; height: 8px; border-radius: 99px; background: var(--surface-3, #ebe9e3); overflow: hidden; }
+.mw-card .mw-bar span { display: block; height: 100%; border-radius: 99px; background: var(--ok); }
+.mw-card .mw-bar span.hot { background: var(--warn); } .mw-card .mw-bar span.over { background: var(--bad); }
+.mw-card .mw-bar i { display: none; }
+.mw-card .mw-foot { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); }
+.mw-card .mw-foot b { color: var(--ink); font-weight: 650; }
+.mw-ask { font-size: 11.5px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.mw-ask::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--warn); }

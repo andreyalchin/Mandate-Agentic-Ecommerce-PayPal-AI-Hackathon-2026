@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { agentLabel, api, mandateTitle, money, shipLine, type Mandate, type Receipt } from "./api";
 import { Icon, Skeleton } from "./ui";
-import { AgentAvatar, ReceiptView, Status, orderTitle as title, type MandateLite } from "./Receipt";
+import { AgentAvatar, Modal, ReceiptView, Status, orderTitle as title, type MandateLite } from "./Receipt";
 
 export { AgentAvatar };
 type Filter = "all" | "paid" | "refunded";
@@ -50,7 +50,6 @@ export function Orders({ mandates }: { mandates: Mandate[] }) {
   const refunded = shown.filter((r) => r.status === "refunded").reduce((a, r) => a + r.totalCents, 0);
   const selected = shown.find((r) => r.id === sel) ?? null;
   const filtered = filter !== "all" || how !== "any" || mid !== "all" || agent !== "all" || period !== "all" || !!needle;
-  useEffect(() => { if ((!sel || !selected) && shown.length && matchMedia("(min-width: 1100px)").matches) setSel(shown[0].id); }, [shown.length, src, selected]);
 
   function exportCsv() {
     const head = ["Date", "Item", "Shop", "Agent", "Amount", "Status", "Ships to", "Mandate", "PayPal order", "Why allowed"];
@@ -61,7 +60,7 @@ export function Orders({ mandates }: { mandates: Mandate[] }) {
   const clear = () => { setFilter("all"); setHow("any"); setMid("all"); setAgent("all"); setPeriod("all"); setQ(""); };
 
   return (
-    <main className={`orders ${selected ? "has-sel" : ""}`}>
+    <main className="orders">
       <div className="page-head">
         <div><h1>Orders</h1><p className="muted sm">{isSample ? "Sample household" : "Your agents"} · what was bought, by which agent, where it ships, and the PayPal receipt.</p></div>
         <div className="row wrap">
@@ -80,8 +79,6 @@ export function Orders({ mandates }: { mandates: Mandate[] }) {
             <button key={f} role="tab" aria-selected={filter === f} className={filter === f ? "on" : ""} onClick={() => setFilter(f)}>{l}<span className="seg-n">{counts[f]}</span></button>)}</div>
           <div className="seg" role="radiogroup" aria-label="Approval">{([["any", "Any approval"], ["auto", "Automatic"], ["you", "Approved by you"]] as [How, string][]).map(([h, l]) =>
             <button key={h} role="radio" aria-checked={how === h} className={how === h ? "on" : ""} onClick={() => setHow(h)}>{l}</button>)}</div>
-          <div className="seg" role="radiogroup" aria-label="Approval">{([["any", "Any"], ["auto", "Automatic"], ["you", "Approved by you"]] as [How, string][]).map(([h, l]) =>
-            <button key={h} role="radio" aria-checked={how === h} className={how === h ? "on" : ""} onClick={() => setHow(h)}>{l}</button>)}</div>
           <label className="search"><span className="sr">Search orders</span>{Icon.search(15)}<input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search item, shop or agent" />{q && <button className="search-x" aria-label="Clear search" onClick={() => setQ("")}>{Icon.x(13)}</button>}</label>
           <label className="select"><span className="sr">Period</span><select value={period} onChange={(e) => setPeriod(e.target.value as Period)}>{PERIODS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>{Icon.chevron(14)}</label>
           <label className="select"><span className="sr">Mandate</span>
@@ -95,7 +92,7 @@ export function Orders({ mandates }: { mandates: Mandate[] }) {
           <button className={`achip ${agent === "all" ? "on" : ""}`} aria-pressed={agent === "all"} onClick={() => setAgent("all")}>All agents</button>
           {agents.map(([name, n]) => <button key={name} className={`achip ${agent === name ? "on" : ""}`} aria-pressed={agent === name} onClick={() => setAgent(agent === name ? "all" : name)}><AgentAvatar name={name} size={20} />{name}<span className="achip-n">{n}</span></button>)}
         </div>
-        <div className="ostats"><span><b className="num">{money(paid)}</b> paid</span>{refunded > 0 && <span><b className="num">{money(refunded)}</b> refunded</span>}<span><b className="num">{shown.length}</b> order{shown.length === 1 ? "" : "s"}</span>{filtered && <button className="link" onClick={clear}>Clear filters</button>}<a className="link ostats-more" href="#/spending">Declined and blocked attempts are in Spending → Purchase history</a><a className="link ostats-more" href="#/spending">Declined and blocked attempts: Spending → Purchase history</a></div>
+        <div className="ostats"><span><b className="num">{money(paid)}</b> paid</span>{refunded > 0 && <span><b className="num">{money(refunded)}</b> refunded</span>}<span><b className="num">{shown.length}</b> order{shown.length === 1 ? "" : "s"}</span>{filtered && <button className="link" onClick={clear}>Clear filters</button>}<a className="link ostats-more" href="#/spending">Declined and blocked attempts are in Spending → Purchase history</a></div>
       </div>
 
       <div className="orders-body">
@@ -116,7 +113,7 @@ export function Orders({ mandates }: { mandates: Mandate[] }) {
                 </ul>
               </div>))}
         </section>
-        {selected && <ReceiptView key={selected.id} r={selected} sample={isSample} mandate={byId.get(selected.mandateId)} onClose={() => setSel(null)} onUndo={async () => { await api(`/api/receipts/${selected.id}/undo`, {}); await load(); }} />}
+        {selected && <Modal label={`Receipt for ${title(selected)}`} onClose={() => setSel(null)}><ReceiptView key={selected.id} r={selected} sample={isSample} mandate={byId.get(selected.mandateId)} compact onClose={() => setSel(null)} closeLabel={<>{Icon.x(15)} Close</>} onUndo={async () => { await api(`/api/receipts/${selected.id}/undo`, {}); await load(); }} /></Modal>}
       </div>
     </main>
   );

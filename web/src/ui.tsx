@@ -28,6 +28,7 @@ export const Icon = {
   truck: (s = 16) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden {...P}><path d="M3 6h11v10H3zM14 10h4l3 3v3h-7" /><circle cx="7" cy="18" r="1.8" /><circle cx="17" cy="18" r="1.8" /></svg>,
   store: (s = 16) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden {...P}><path d="M4 9l1.5-5h13L20 9M4 9h16v2a3 3 0 01-5.3 2 3 3 0 01-5.4 0A3 3 0 014 11V9zM5 13v7h14v-7" /></svg>,
   download: (s = 16) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden {...P}><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></svg>,
+  pencil: (s = 16) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden {...P}><path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4" /></svg>,
   printer: (s = 16) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden {...P}><path d="M7 8V3h10v5M7 17H4v-7a2 2 0 012-2h12a2 2 0 012 2v7h-3M7 14h10v7H7z" /></svg>,
   refresh: (s = 16) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden {...P}><path d="M20 11a8 8 0 10-2.3 5.7M20 4v7h-7" /></svg>,
   logout: (s = 16) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden {...P}><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10" /></svg>,
@@ -149,7 +150,7 @@ export function useDismiss(open: boolean, close: () => void) {
 }
 
 /** The public PayPal sandbox buyer from the README, so testers can copy it without leaving the page. */
-export const SANDBOX_BUYER = { email: "sb-kejwc53484103@personal.example.com", password: "uRS6ZeS<" };
+export const SANDBOX_BUYER = { email: "sb-kejwc53484103@personal.example.com", password: "12345678" };
 function CopyField({ label, value }: { label: string; value: string }) {
   const [ok, setOk] = useState(false);
   return <div className="sbx-row"><span>{label}</span><code>{value}</code>

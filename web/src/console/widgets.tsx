@@ -57,6 +57,12 @@ const PURCHASED = new Set(["Allowed", "Approved by you"]);
 const asDate = (v: any) => (v instanceof Date ? v : new Date(typeof v === "number" ? v : String(v).length <= 10 ? `${v}T12:00:00` : v));
 
 /* ---------- Spend summary ---------- */
+/** Ask the page to open a drill-down of the attempts behind a chart element. */
+export type DrillWhere = { from?: number; to?: number; category?: string; merchant?: string; mandate?: string; agent?: string; outcomes?: string[]; rule?: string };
+const drill = (title: string, where: DrillWhere, sub?: string) => window.dispatchEvent(new CustomEvent("mandate:drill", { detail: { title, sub, where } }));
+const PURCHASE_OUTCOMES = ["Allowed", "Approved by you", "Refunded"];
+const onKey = (f: () => void) => (e: { key: string; preventDefault(): void }) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); f(); } };
+
 function SpendSummary(props: any) {
   const rows = useMapped(props, ["outcome", "count", "spent", "amount"]);
   if (!rows) return null;
@@ -66,12 +72,13 @@ function SpendSummary(props: any) {
   const blocked = by("Blocked"); const approved = sum(by("Approved by you"), "count"); const declined = sum(by("Declined by you"), "count"); const waiting = sum(by("Waiting for you"), "count");
   const refunded = by("Refunded");
   const tiles = [
-    { label: "Spent", value: usd(spent), sub: `${num(purchases)} purchase${purchases === 1 ? "" : "s"}${purchases ? ` · avg ${usd(spent / Math.max(1, purchases))}` : ""}`, tone: "ink" },
-    { label: "Stopped by your rules", value: usd(sum(blocked, "amount")), sub: `${num(sum(blocked, "count"))} attempt${sum(blocked, "count") === 1 ? "" : "s"} blocked, no money moved`, tone: "bad" },
-    { label: "Asked for your OK", value: num(approved + declined + waiting), sub: `${num(approved)} approved · ${num(declined)} declined${waiting ? ` · ${num(waiting)} waiting` : ""}`, tone: "warn" },
-    { label: "Refunded with Undo", value: usd(sum(refunded, "amount")), sub: `${num(sum(refunded, "count"))} purchase${sum(refunded, "count") === 1 ? "" : "s"} undone`, tone: "muted" },
+    { label: "Spent", value: usd(spent), sub: `${num(purchases)} purchase${purchases === 1 ? "" : "s"}${purchases ? ` · avg ${usd(spent / Math.max(1, purchases))}` : ""}`, tone: "ink", outcomes: PURCHASE_OUTCOMES },
+    { label: "Stopped by your rules", value: usd(sum(blocked, "amount")), sub: `${num(sum(blocked, "count"))} attempt${sum(blocked, "count") === 1 ? "" : "s"} blocked, no money moved`, tone: "bad", outcomes: ["Blocked"] },
+    { label: "Asked for your OK", value: num(approved + declined + waiting), sub: `${num(approved)} approved · ${num(declined)} declined${waiting ? ` · ${num(waiting)} waiting` : ""}`, tone: "warn", outcomes: ["Approved by you", "Declined by you", "Waiting for you"] },
+    { label: "Refunded with Undo", value: usd(sum(refunded, "amount")), sub: `${num(sum(refunded, "count"))} purchase${sum(refunded, "count") === 1 ? "" : "s"} undone`, tone: "muted", outcomes: ["Refunded"] },
   ];
-  return <div className="w-summary">{tiles.map((t) => <div key={t.label} className={`w-tile ${t.tone}`}><span className="w-label"><i />{t.label}</span><span className="w-value num">{t.value}</span><span className="w-sub">{t.sub}</span></div>)}</div>;
+  return <div className="w-summary">{tiles.map((t) => { const go = () => drill(t.label, { outcomes: t.outcomes });
+    return <div key={t.label} className={`w-tile ${t.tone} drillable`} role="button" tabIndex={0} onClick={go} onKeyDown={onKey(go)} title="See the details"><span className="w-label"><i />{t.label}</span><span className="w-value num">{t.value}</span><span className="w-sub">{t.sub}</span></div>; })}</div>;
 }
 
 /* ---------- Spend trend ---------- */
@@ -110,14 +117,14 @@ function SpendTrend(props: any) {
           {[0, 0.5, 1].map((f) => <g key={f}><line x1={padL} x2={w} y1={y(nice * f)} y2={y(nice * f)} className="grid" /><text x={padL - 10} y={y(nice * f) + 4} textAnchor="end" className="axis">{short(nice * f)}</text></g>)}
           {data.map((d, i) => { const x = padL + i * bw + (bw - barW) / 2; const hs = (d.spent / nice) * ch; const hb = (d.blocked / nice) * ch;
             return <g key={d.t} onMouseEnter={() => setHover(i)} className={hover === i ? "on" : ""}>
-              <rect x={padL + i * bw} y={padT} width={bw} height={ch} className="hit" />
+              <rect x={padL + i * bw} y={padT} width={bw} height={ch} className="hit" onClick={() => drill(weekly ? `Week of ${label(d.t)}` : label(d.t), { from: d.t, to: d.t + (weekly ? 7 : 1) * 86400e3 }, `${usd(d.spent)} spent${d.blocked ? ` · ${usd(d.blocked)} blocked` : ""}`)} />
               {d.blocked > 0 && <rect x={x} y={y(d.spent + d.blocked)} width={barW} height={Math.max(2, hb)} rx={Math.min(4, barW / 2)} className="bar-blocked" />}
               {d.spent > 0 && <rect x={x} y={y(d.spent)} width={barW} height={Math.max(2, hs)} rx={Math.min(4, barW / 2)} className="bar-spent" />}
               {i % every === 0 && <text x={padL + i * bw + bw / 2} y={h - 6} textAnchor="middle" className="axis">{label(d.t)}</text>}
             </g>; })}
         </svg>}
         {hv && <div className="w-tip" style={{ left: Math.min(Math.max(padL + hover! * bw + bw / 2, 80), w - 80) }}>
-          <b>{weekly ? `Week of ${label(hv.t)}` : label(hv.t)}</b><span><i className="spent" />{usd(hv.spent)} spent</span>{hv.blocked > 0 && <span><i className="blocked" />{usd(hv.blocked)} blocked</span>}
+          <b>{weekly ? `Week of ${label(hv.t)}` : label(hv.t)}</b><span><i className="spent" />{usd(hv.spent)} spent</span>{hv.blocked > 0 && <span><i className="blocked" />{usd(hv.blocked)} blocked</span>}<em>Click for details</em>
         </div>}
       </div>
     </div>
@@ -130,8 +137,8 @@ function Breakdown(props: any) {
   const rows = useMapped(props, ["category", "shop", "spent"]);
   const [by, setBy] = useState<"category" | "shop">("category");
   if (!rows) return null;
-  const m = new Map<string, number>();
-  for (const r of rows) { const k = by === "category" ? cap(String(r.category ?? "")) : String(r.shop || "Other"); m.set(k, (m.get(k) ?? 0) + (Number(r.spent) || 0)); }
+  const m = new Map<string, number>(); const raw = new Map<string, string>();
+  for (const r of rows) { const rk = by === "category" ? String(r.category ?? "") : String(r.shop || ""); const k = by === "category" ? cap(rk) : rk || "Other"; raw.set(k, rk); m.set(k, (m.get(k) ?? 0) + (Number(r.spent) || 0)); }
   const list = [...m.entries()].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
   const total = list.reduce((a, [, v]) => a + v, 0);
   const top = list.slice(0, 6); const rest = list.slice(6).reduce((a, [, v]) => a + v, 0);
@@ -140,10 +147,11 @@ function Breakdown(props: any) {
     <div className="w-break">
       <div className="seg tiny" role="tablist">{(["category", "shop"] as const).map((k) => <button key={k} role="tab" aria-selected={by === k} className={by === k ? "on" : ""} onClick={() => setBy(k)}>{k === "category" ? "Category" : "Shop"}</button>)}</div>
       {top.length === 0 ? <p className="w-sub">No spending in this view.</p> :
-        <ul>{top.map(([k, v], i) => <li key={k}>
+        <ul>{top.map(([k, v], i) => { const go = () => k !== "Everything else" && drill(k, by === "category" ? { category: raw.get(k) ?? k } : { merchant: raw.get(k) ?? k }, `${usd(v)} spent`);
+          return <li key={k} className={k !== "Everything else" ? "drillable" : ""} role={k !== "Everything else" ? "button" : undefined} tabIndex={k !== "Everything else" ? 0 : undefined} onClick={go} onKeyDown={onKey(go)}>
           <div className="w-break-top"><span className="w-break-name"><i style={{ background: `var(--c${i})` }} />{k}</span><span className="num"><b>{usd(v)}</b><span className="w-sub"> {Math.round((v / total) * 100)}%</span></span></div>
           <div className="w-bar"><span style={{ width: `${(v / top[0][1]) * 100}%`, background: `var(--c${i})` }} /></div>
-        </li>)}</ul>}
+        </li>; })}</ul>}
     </div>
   );
 }
@@ -152,16 +160,21 @@ function Breakdown(props: any) {
 function MandateMeter(props: any) {
   const rows = useMapped(props, ["mandate", "spent", "budget", "askAbove"]);
   if (!rows) return null;
+  if (!rows.length) return <p className="w-sub">No budgets in this view.</p>;
   return (
     <div className="mw-meter" role="list">
       {rows.map((r, i) => {
         const name = String(r.mandate ?? ""); const spent = Number(r.spent ?? 0); const budget = Number(r.budget ?? 0); const ask = Number(r.askAbove ?? 0);
         const pct = budget ? Math.min(100, (spent / budget) * 100) : 0; const over = budget > 0 && spent > budget; const left = Math.max(0, budget - spent);
+        const [title] = name.split(" · "); const c2 = (n: number) => `$${n.toFixed(2)}`;
+        const state = over ? "over" : pct >= 85 ? "hot" : "ok";
+        const go = () => drill(title, { mandate: name, outcomes: PURCHASE_OUTCOMES }, `${usd(spent)} of ${usd(budget)} spent this month`);
         return (
-          <div key={i} className="mw-row" role="listitem" title={name}>
-            <div className="mw-top"><span className="mw-name">{name}</span><span className={`mw-num ${over ? "over" : ""}`}>{usd(spent)}<span> of {usd(budget)}</span></span></div>
-            <div className="mw-bar"><span className={over ? "over" : pct > 85 ? "hot" : ""} style={{ width: `${pct}%` }} />{ask > 0 && budget > 0 && <i title={`Asks you above ${usd(ask)}`} style={{ left: `${Math.min(100, (ask / budget) * 100)}%` }} />}</div>
-            <div className="mw-foot"><span>{over ? `${usd(spent - budget)} over budget` : `${usd(left)} left`}</span>{ask > 0 && <span>asks you above {usd(ask)}</span>}</div>
+          <div key={i} className={`mw-card ${state} drillable`} role="listitem" tabIndex={0} onClick={go} onKeyDown={onKey(go)} title="See what was bought">
+            <div className="mw-top"><span className="mw-name">{title}</span><span className={`mw-left ${state}`}>{over ? `${c2(spent - budget)} over` : `${c2(left)} left`}</span></div>
+            <div className="mw-bar" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100} aria-label={`${title}: ${Math.round(pct)}% of budget used`}><span className={state} style={{ width: `${Math.max(pct, spent > 0 ? 2 : 0)}%` }} /></div>
+            <div className="mw-foot"><span><b className="num">{c2(spent)}</b> spent of {c2(budget)}</span><span className="num">{budget ? Math.round((spent / budget) * 100) : 0}% used</span></div>
+            {ask > 0 && <p className="mw-ask">Asks you first above {usd(ask)}</p>}
           </div>
         );
       })}
@@ -188,7 +201,7 @@ function DecisionFlow(props: any) {
       <div className="mw-stack" aria-hidden>{groups.map((g) => g.n > 0 && <span key={g.key} className={g.tone} style={{ flexGrow: g.n }} />)}</div>
       <ul className="mw-groups">
         {groups.map((g) => (
-          <li key={g.key} className={`mw-group ${g.tone}`}>
+          <li key={g.key} className={`mw-group ${g.tone} drillable`} role="button" tabIndex={0} onClick={() => drill(g.label, { outcomes: g.outcomes })} onKeyDown={onKey(() => drill(g.label, { outcomes: g.outcomes }))}>
             <span className="mw-gdot" />
             <span className="mw-gtext"><b>{g.label}</b><span>{subs(g) || g.note}</span></span>
             <span className="mw-gnum"><b className="num">{num(g.n)}</b><span className="num">{pct(g.n)}%</span></span>
@@ -217,9 +230,9 @@ function AgentCards(props: any) {
   return (
     <div className="w-agents">
       {list.map(([name, a], i) => (
-        <article key={name} className="w-agent">
+        <article key={name} className="w-agent drillable" tabIndex={0} onClick={(e) => { if (!(e.target as HTMLElement).closest(".w-agent-rm")) drill(name, { agent: name }); }} onKeyDown={(e) => { if (e.target === e.currentTarget) onKey(() => drill(name, { agent: name }))(e); }}>
           <header><span className="w-avatar" style={{ background: `var(--c${i}-soft)`, color: `var(--c${i})` }}>{initials(name)}</span><span className="w-agent-name"><b>{name}</b><span>{name === "Shopping agent" ? "Built-in agent" : "Outside agent"}</span></span>
-            <button className="w-agent-rm" onClick={() => window.dispatchEvent(new CustomEvent("mandate:remove-agent", { detail: { name } }))} aria-label={`Remove ${name}`} title="Remove agent"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12M9 7V4h6v3" /></svg></button></header>
+            <button className="w-agent-rm" onClick={(e) => { e.stopPropagation(); window.dispatchEvent(new CustomEvent("mandate:remove-agent", { detail: { name } })); }} aria-label={`Remove ${name}`} title="Remove agent"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12M9 7V4h6v3" /></svg></button></header>
           <div className="w-agent-big"><span className="w-value num">{usd(a.spent)}</span><span className="w-sub">spent</span></div>
           <dl>
             <div><dt>Bought</dt><dd className="num">{num(a.bought)}</dd></div>
@@ -246,7 +259,7 @@ function RuleList(props: any) {
   const list = [...m.entries()].sort((a, b) => b[1] - a[1]); const max = list[0]?.[1] ?? 1;
   const tone = (r: string) => (r === "Within mandate" ? "ok" : r === "Your approval" || r.startsWith("Over ask") || r === "Over budget" ? "warn" : "bad");
   return (
-    <ul className="w-rules">{list.map(([r, n]) => <li key={r} className={tone(r)}>
+    <ul className="w-rules">{list.map(([r, n]) => <li key={r} className={`${tone(r)} drillable`} role="button" tabIndex={0} onClick={() => drill(r, { rule: r })} onKeyDown={onKey(() => drill(r, { rule: r }))}>
       <div className="w-rule-top"><span><b>{r}</b><span className="w-sub">{RULE_HELP[r] ?? ""}</span></span><b className="num">{num(n)}</b></div>
       <div className="w-bar"><span style={{ width: `${(n / max) * 100}%` }} /></div>
     </li>)}</ul>
@@ -260,12 +273,13 @@ const PH_FILTERS: [string, string, (o: string) => boolean][] = [
   ["all", "All", () => true], ["bought", "Bought", (o) => o === "Allowed"], ["approved", "Approved by you", (o) => o === "Approved by you"],
   ["declined", "Declined by you", (o) => o === "Declined by you"], ["blocked", "Blocked", (o) => o === "Blocked"], ["refunded", "Refunded", (o) => o === "Refunded"], ["waiting", "Waiting for you", (o) => o === "Waiting for you"],
 ];
+export const PH_PAGE = 10;
 const PH_TONE: Record<string, string> = { Allowed: "ok", "Approved by you": "ok", Refunded: "muted", "Declined by you": "bad", Blocked: "bad", "Waiting for you": "warn" };
 const PH_LABEL: Record<string, string> = { Allowed: "Bought", "Approved by you": "Approved", "Declined by you": "Declined", Blocked: "Blocked", Refunded: "Refunded", "Waiting for you": "Waiting" };
 type PhSort = "new" | "old" | "high" | "low";
 function PurchaseHistory(props: any) {
   const rows = useMapped(props, PH_SLOTS);
-  const [f, setF] = useState("all"); const [sort, setSort] = useState<PhSort>("new");
+  const [f, setF] = useState("all"); const [sort, setSort] = useState<PhSort>("new"); const [pg, setPg] = useState(0);
   const [ref, { w }] = useSize<HTMLDivElement>(rows === null);
   if (!rows) return null;
   const list0: any[] = rows.map((r: any) => ({ ...r, amount: Number(r.amount) || 0, t: +new Date(String(r.at)) }));
@@ -273,23 +287,24 @@ function PurchaseHistory(props: any) {
   const match = PH_FILTERS.find(([k]) => k === f)?.[2] ?? (() => true);
   const list = list0.filter((r) => match(String(r.outcome))).sort((a, b) => sort === "new" ? b.t - a.t : sort === "old" ? a.t - b.t : sort === "high" ? b.amount - a.amount || b.t - a.t : a.amount - b.amount || b.t - a.t);
   const narrow = w > 0 && w < 620;
+  const pages = Math.max(1, Math.ceil(list.length / PH_PAGE)); const cur = Math.min(pg, pages - 1); const shown = list.slice(cur * PH_PAGE, cur * PH_PAGE + PH_PAGE);
   const money2 = (n: number) => `$${n.toFixed(2)}`;
   const open = (r: any) => window.dispatchEvent(new CustomEvent("mandate:attempt", { detail: r }));
   const head = (key: "date" | "amount", label: string) => { const on = key === "date" ? sort === "new" || sort === "old" : sort === "high" || sort === "low";
     const next: PhSort = key === "date" ? (sort === "new" ? "old" : "new") : (sort === "high" ? "low" : "high");
     const arrow = !on ? "" : sort === "new" || sort === "high" ? " ↓" : " ↑";
-    return <button className={`ph-sort ${on ? "on" : ""}`} onClick={() => setSort(next)} aria-label={`Sort by ${label}`}>{label}{arrow}</button>; };
+    return <button className={`ph-sort ${on ? "on" : ""}`} onClick={() => { setSort(next); setPg(0); }} aria-label={`Sort by ${label}`}>{label}{arrow}</button>; };
   return (
     <div className="w-ph" ref={ref}>
       <div className="ph-bar">
         <div className="ph-chips" role="group" aria-label="Filter by outcome">{PH_FILTERS.filter(([k]) => k === "all" || counts[k] > 0).map(([k, l]) =>
-          <button key={k} className={`ph-chip ${f === k ? "on" : ""} ${k}`} aria-pressed={f === k} onClick={() => setF(k)}>{l}<span>{counts[k]}</span></button>)}</div>
-        <label className="ph-select"><span className="sr">Sort</span><select value={sort} onChange={(e) => setSort(e.target.value as PhSort)}>
+          <button key={k} className={`ph-chip ${f === k ? "on" : ""} ${k}`} aria-pressed={f === k} onClick={() => { setF(k); setPg(0); }}>{l}<span>{counts[k]}</span></button>)}</div>
+        <label className="ph-select"><span className="sr">Sort</span><select value={sort} onChange={(e) => { setSort(e.target.value as PhSort); setPg(0); }}>
           <option value="new">Newest first</option><option value="old">Oldest first</option><option value="high">Highest amount</option><option value="low">Lowest amount</option></select></label>
       </div>
       {!narrow && <div className="ph-row ph-head" aria-hidden><span /><span>Item</span><span>Agent</span><span>Outcome</span>{head("date", "Date")}<span className="r">{head("amount", "Amount")}</span></div>}
       <div className="ph-list" role="list">
-        {list.length === 0 ? <p className="w-sub ph-empty">Nothing here for this filter.</p> : list.map((r) => {
+        {list.length === 0 ? <p className="w-sub ph-empty">Nothing here for this filter.</p> : shown.map((r) => {
           const tone = PH_TONE[String(r.outcome)] ?? "muted"; const date = new Date(r.t).toLocaleDateString("en-US", { month: "short", day: "numeric" });
           return <button key={String(r.id)} role="listitem" className={`ph-row ${narrow ? "narrow" : ""}`} onClick={() => open(r)} title="Open receipt">
             <span className="ph-thumb">{r.image ? <img src={String(r.image)} alt="" loading="lazy" /> : <i>{String(r.merchant || r.item || "?").charAt(0).toUpperCase()}</i>}</span>
@@ -300,6 +315,8 @@ function PurchaseHistory(props: any) {
             <span className="ph-amt r"><b className={`num ${tone === "bad" ? "strike" : ""}`}>{money2(r.amount)}</b>{narrow && <span className={`ph-out ${tone}`}>{PH_LABEL[String(r.outcome)] ?? String(r.outcome)}</span>}</span>
           </button>; })}
       </div>
+      {list.length > PH_PAGE && <div className="ph-pager"><span className="w-sub">{cur * PH_PAGE + 1}–{Math.min(list.length, (cur + 1) * PH_PAGE)} of {list.length}</span>
+        <div className="row"><button className="ph-pg" disabled={cur === 0} onClick={() => setPg(cur - 1)} aria-label="Previous page">‹ Prev</button><button className="ph-pg" disabled={cur >= pages - 1} onClick={() => setPg(cur + 1)} aria-label="Next page">Next ›</button></div></div>}
     </div>
   );
 }
