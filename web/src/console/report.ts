@@ -17,18 +17,13 @@ const overview: AgPageState = {
     where: { type: "spend-breakdown", dataMapping: { category: [f("attempts.category")], shop: [f("attempts.merchant")], spent: [sum("attempts.spent")] }, format: title("Where it went") } as any,
     meters: { type: "mandate-meter", dataMapping: { mandate: [f("mandates.title")], spent: [sum("attempts.spentThisMonth")], budget: [max("mandates.budget")], askAbove: [max("mandates.askAbove")] }, format: title("Budgets this month") } as any,
     flow: { type: "decision-flow", dataMapping: { outcome: [f("attempts.outcome")], value: [sum("attempts.attempts")] }, format: title("How your rules decided") } as any,
-    ledger: {
-      type: "grid",
-      dataMapping: { cols: [f("attempts.day"), f("attempts.item"), f("attempts.merchant"), f("attempts.outcome"), f("attempts.mandate"), f("attempts.amountText")] },
-      sort: [{ field: f("attempts.day"), direction: "desc" }],
-      format: title("Every attempt", "Newest first. Blocked rows moved no money."),
-    } as any,
+    ledger: { type: "purchase-history", dataMapping: Object.fromEntries(["id", "at", "item", "merchant", "agent", "outcome", "image", "mandate", "mandateId", "rule", "reason", "rationale", "source"].map((k) => [k, [f(`attempts.${k}`)]]).concat([["amount", [f("attempts.amount")]]])), format: title("Purchase history", "Everything your agents bought or tried. Click a row for its receipt.") } as any,
   },
   widgetLayout: {
     summary: at(0, 0, 24, 7),
     trend: at(0, 7, 16, 16), where: at(16, 7, 8, 16),
     meters: at(0, 23, 12, 15), flow: at(12, 23, 12, 15),
-    ledger: at(0, 38, 24, 24),
+    ledger: at(0, 38, 24, 30),
   },
 };
 
@@ -37,18 +32,13 @@ const agents: AgPageState = {
   widgets: {
     cards: { type: "agent-cards", dataMapping: { agent: [f("attempts.agent")], outcome: [f("attempts.outcome")], count: [sum("attempts.attempts")], spent: [sum("attempts.spent")], amount: [sum("attempts.amount")] }, format: noTitle } as any,
     rules: { type: "rule-list", dataMapping: { rule: [f("attempts.rule")], count: [sum("attempts.attempts")] }, format: title("Which rule decided") } as any,
-    activity: {
-      type: "grid",
-      dataMapping: { cols: [f("attempts.day"), f("attempts.agent"), f("attempts.item"), f("attempts.outcome"), f("attempts.rule"), f("attempts.amountText")] },
-      sort: [{ field: f("attempts.day"), direction: "desc" }],
-      format: title("What each agent tried", "Every attempt with the rule that decided it"),
-    } as any,
+    activity: { type: "purchase-history", dataMapping: Object.fromEntries(["id", "at", "item", "merchant", "agent", "outcome", "image", "mandate", "mandateId", "rule", "reason", "rationale", "source"].map((k) => [k, [f(`attempts.${k}`)]]).concat([["amount", [f("attempts.amount")]]])), format: title("Purchase history by agent", "Click a row for its receipt.") } as any,
   },
   widgetLayout: { cards: at(0, 0, 24, 15), rules: at(0, 15, 9, 24), activity: at(9, 15, 15, 24) },
 };
 /** How many rows each list-like widget needs for the data on screen. */
 export interface Counts { agents: number; rules: number; mandates: number; groups: number; rows?: number }
-const agentsDesk = (c: Counts): AgPageState => { const h = Math.ceil(Math.max(1, c.agents) / 3) * 13 + 2; return { ...agents, widgetLayout: { cards: at(0, 0, 24, h), rules: at(0, h, 9, 24), activity: at(9, h, 15, 24) } }; };
+const agentsDesk = (c: Counts): AgPageState => { const perRow = typeof innerWidth === "number" && innerWidth >= 1380 ? 5 : innerWidth >= 1100 ? 4 : 3; const h = Math.ceil(Math.max(1, c.agents) / perRow) * 13 + 2; return { ...agents, widgetLayout: { cards: at(0, 0, 24, h), rules: at(0, h, 9, 30), activity: at(9, h, 15, 30) } }; };
 
 export const pageTitles: Record<string, string> = { overview: "Overview", agents: "Agents" };
 

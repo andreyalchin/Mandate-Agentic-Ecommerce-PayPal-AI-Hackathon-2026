@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api, amt, dateOf, mandateTitle, money, shipLine, shortDate, timeOf, type ActivityEvent, type AgentRun, type AgentStep, type CartMandate, type Mandate, type MandateState, type Receipt } from "./api";
-import { Count, Icon, MicButton, PayPalButton, Skeleton, Spinner, useDismiss } from "./ui";
+import { Count, Icon, MicButton, PayPalButton, SandboxBuyer, Skeleton, Spinner, useDismiss } from "./ui";
 import { useSpeech } from "./speech";
 
 const PROMPTS = [
@@ -290,6 +290,7 @@ function Approval({ c, onDone, onDecline }: { c: CartMandate; onDone: (r: Receip
       <p className="ap-what">{lineText(c.lines)}</p>
       <p className="sm muted">{c.policy.reason}</p>
       <PayPalButton kind="approve" cartId={c.id} onDone={onDone} onError={setErr} />
+      <details className="sbx-more"><summary>Need the sandbox login?</summary><SandboxBuyer compact /></details>
       <button className="btn ghost sm full" onClick={onDecline}>Decline</button>
       {err && <p className="hint err">{err}</p>}
     </article>

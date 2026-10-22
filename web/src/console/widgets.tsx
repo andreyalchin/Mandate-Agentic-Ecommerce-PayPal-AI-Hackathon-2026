@@ -218,7 +218,8 @@ function AgentCards(props: any) {
     <div className="w-agents">
       {list.map(([name, a], i) => (
         <article key={name} className="w-agent">
-          <header><span className="w-avatar" style={{ background: `var(--c${i}-soft)`, color: `var(--c${i})` }}>{initials(name)}</span><span className="w-agent-name"><b>{name}</b><span>{/claude code|mcp/i.test(name) ? "Outside agent · MCP key" : name === "Shopping agent" ? "Built-in agent" : "Agent"}</span></span></header>
+          <header><span className="w-avatar" style={{ background: `var(--c${i}-soft)`, color: `var(--c${i})` }}>{initials(name)}</span><span className="w-agent-name"><b>{name}</b><span>{name === "Shopping agent" ? "Built-in agent" : "Outside agent"}</span></span>
+            <button className="w-agent-rm" onClick={() => window.dispatchEvent(new CustomEvent("mandate:remove-agent", { detail: { name } }))} aria-label={`Remove ${name}`} title="Remove agent"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12M9 7V4h6v3" /></svg></button></header>
           <div className="w-agent-big"><span className="w-value num">{usd(a.spent)}</span><span className="w-sub">spent</span></div>
           <dl>
             <div><dt>Bought</dt><dd className="num">{num(a.bought)}</dd></div>
@@ -252,6 +253,57 @@ function RuleList(props: any) {
   );
 }
 
+
+/* ---------- Purchase history ---------- */
+const PH_SLOTS = ["id", "at", "item", "merchant", "agent", "outcome", "amount", "image", "mandate", "mandateId", "rule", "reason", "rationale", "source"];
+const PH_FILTERS: [string, string, (o: string) => boolean][] = [
+  ["all", "All", () => true], ["bought", "Bought", (o) => o === "Allowed"], ["approved", "Approved by you", (o) => o === "Approved by you"],
+  ["declined", "Declined by you", (o) => o === "Declined by you"], ["blocked", "Blocked", (o) => o === "Blocked"], ["refunded", "Refunded", (o) => o === "Refunded"], ["waiting", "Waiting for you", (o) => o === "Waiting for you"],
+];
+const PH_TONE: Record<string, string> = { Allowed: "ok", "Approved by you": "ok", Refunded: "muted", "Declined by you": "bad", Blocked: "bad", "Waiting for you": "warn" };
+const PH_LABEL: Record<string, string> = { Allowed: "Bought", "Approved by you": "Approved", "Declined by you": "Declined", Blocked: "Blocked", Refunded: "Refunded", "Waiting for you": "Waiting" };
+type PhSort = "new" | "old" | "high" | "low";
+function PurchaseHistory(props: any) {
+  const rows = useMapped(props, PH_SLOTS);
+  const [f, setF] = useState("all"); const [sort, setSort] = useState<PhSort>("new");
+  const [ref, { w }] = useSize<HTMLDivElement>(rows === null);
+  if (!rows) return null;
+  const list0: any[] = rows.map((r: any) => ({ ...r, amount: Number(r.amount) || 0, t: +new Date(String(r.at)) }));
+  const counts = Object.fromEntries(PH_FILTERS.map(([k, , m]) => [k, list0.filter((r) => m(String(r.outcome))).length]));
+  const match = PH_FILTERS.find(([k]) => k === f)?.[2] ?? (() => true);
+  const list = list0.filter((r) => match(String(r.outcome))).sort((a, b) => sort === "new" ? b.t - a.t : sort === "old" ? a.t - b.t : sort === "high" ? b.amount - a.amount || b.t - a.t : a.amount - b.amount || b.t - a.t);
+  const narrow = w > 0 && w < 620;
+  const money2 = (n: number) => `$${n.toFixed(2)}`;
+  const open = (r: any) => window.dispatchEvent(new CustomEvent("mandate:attempt", { detail: r }));
+  const head = (key: "date" | "amount", label: string) => { const on = key === "date" ? sort === "new" || sort === "old" : sort === "high" || sort === "low";
+    const next: PhSort = key === "date" ? (sort === "new" ? "old" : "new") : (sort === "high" ? "low" : "high");
+    const arrow = !on ? "" : sort === "new" || sort === "high" ? " ↓" : " ↑";
+    return <button className={`ph-sort ${on ? "on" : ""}`} onClick={() => setSort(next)} aria-label={`Sort by ${label}`}>{label}{arrow}</button>; };
+  return (
+    <div className="w-ph" ref={ref}>
+      <div className="ph-bar">
+        <div className="ph-chips" role="group" aria-label="Filter by outcome">{PH_FILTERS.filter(([k]) => k === "all" || counts[k] > 0).map(([k, l]) =>
+          <button key={k} className={`ph-chip ${f === k ? "on" : ""} ${k}`} aria-pressed={f === k} onClick={() => setF(k)}>{l}<span>{counts[k]}</span></button>)}</div>
+        <label className="ph-select"><span className="sr">Sort</span><select value={sort} onChange={(e) => setSort(e.target.value as PhSort)}>
+          <option value="new">Newest first</option><option value="old">Oldest first</option><option value="high">Highest amount</option><option value="low">Lowest amount</option></select></label>
+      </div>
+      {!narrow && <div className="ph-row ph-head" aria-hidden><span /><span>Item</span><span>Agent</span><span>Outcome</span>{head("date", "Date")}<span className="r">{head("amount", "Amount")}</span></div>}
+      <div className="ph-list" role="list">
+        {list.length === 0 ? <p className="w-sub ph-empty">Nothing here for this filter.</p> : list.map((r) => {
+          const tone = PH_TONE[String(r.outcome)] ?? "muted"; const date = new Date(r.t).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+          return <button key={String(r.id)} role="listitem" className={`ph-row ${narrow ? "narrow" : ""}`} onClick={() => open(r)} title="Open receipt">
+            <span className="ph-thumb">{r.image ? <img src={String(r.image)} alt="" loading="lazy" /> : <i>{String(r.merchant || r.item || "?").charAt(0).toUpperCase()}</i>}</span>
+            <span className="ph-item"><b>{String(r.item)}</b><span>{narrow ? `${r.agent} · ${date}` : `${r.merchant || "—"} · ${r.mandate}`}</span></span>
+            {!narrow && <span className="ph-agent">{String(r.agent)}</span>}
+            {!narrow && <span><span className={`ph-out ${tone}`}>{PH_LABEL[String(r.outcome)] ?? String(r.outcome)}</span></span>}
+            {!narrow && <span className="ph-date">{date}</span>}
+            <span className="ph-amt r"><b className={`num ${tone === "bad" ? "strike" : ""}`}>{money2(r.amount)}</b>{narrow && <span className={`ph-out ${tone}`}>{PH_LABEL[String(r.outcome)] ?? String(r.outcome)}</span>}</span>
+          </button>; })}
+      </div>
+    </div>
+  );
+}
+
 /* ---------- Registry ---------- */
 const icon = (d: string) => ({ url: `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='#1d4f3f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>${d}</svg>`)}` });
 const field = (roles: string[], required = true) => ({ type: "field", supportedRoles: roles, requires: { cardinality: "one" }, required });
@@ -276,9 +328,11 @@ export const consoleWidgets = createWidgets<any>({
       "How agent payment attempts split: bought on its own (Allowed, Refunded), asked you first (Approved / Declined / Waiting), Blocked. Map outcome = attempts.outcome and value = sum(attempts.attempts) for counts, or sum(attempts.amount) for value."),
     def("agent-cards", "Agent cards", "<circle cx='9' cy='9' r='3'/><path d='M3 19a6 6 0 0112 0M16 6h5M16 10h5M16 14h3'/>", [["agent", "Agent", CAT], ["outcome", "Outcome", CAT], ["count", "Attempts", NUM], ["spent", "Spent", NUM], ["amount", "Attempted", NUM]], AgentCards, [960, 240],
       "One card per AI agent: spend, purchases, times it asked the person, blocks and stopped value. Map agent = attempts.agent, outcome = attempts.outcome, count = sum(attempts.attempts), spent = sum(attempts.spent), amount = sum(attempts.amount)."),
+    def("purchase-history", "Purchase history", "<path d='M4 6h16M4 12h16M4 18h10'/>", PH_SLOTS.map((k) => [k, k, k === "amount" ? NUM : CAT, ["id", "item", "outcome", "amount"].includes(k)] as [string, string, string[], boolean]), PurchaseHistory, [960, 420],
+      "Every purchase an agent made or tried, newest first, with outcome filters (bought, approved by you, declined by you, blocked, refunded) and sorting by date or amount; clicking a row opens its receipt. Map each slot to the attempts field of the same name, with amount = sum(attempts.amount)."),
     def("rule-list", "Which rule decided", "<path d='M5 6h14M5 12h10M5 18h6'/>", [["rule", "Rule", CAT], ["count", "Attempts", NUM]], RuleList, [400, 300],
       "Mandate rules ranked by how many attempts they decided, with a plain-language explanation of each. Map rule = attempts.rule, count = sum(attempts.attempts)."),
   ],
   // Mandate widgets first, then every built-in group (a custom menu replaces the default one).
-  menu: [{ label: "Mandate", widgetIds: ["spend-summary", "spend-trend", "spend-breakdown", "mandate-meter", "decision-flow", "agent-cards", "rule-list"] }, ..._WIDGET_MENU],
+  menu: [{ label: "Mandate", widgetIds: ["spend-summary", "spend-trend", "spend-breakdown", "mandate-meter", "decision-flow", "agent-cards", "rule-list", "purchase-history"] }, ..._WIDGET_MENU],
 } as any);

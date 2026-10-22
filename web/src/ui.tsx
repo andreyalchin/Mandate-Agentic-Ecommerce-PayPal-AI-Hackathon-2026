@@ -147,3 +147,21 @@ export function useDismiss(open: boolean, close: () => void) {
   }, [open]);
   return ref;
 }
+
+/** The public PayPal sandbox buyer from the README, so testers can copy it without leaving the page. */
+export const SANDBOX_BUYER = { email: "sb-kejwc53484103@personal.example.com", password: "uRS6ZeS<" };
+function CopyField({ label, value }: { label: string; value: string }) {
+  const [ok, setOk] = useState(false);
+  return <div className="sbx-row"><span>{label}</span><code>{value}</code>
+    <button type="button" className={`sbx-copy ${ok ? "ok" : ""}`} aria-label={`Copy ${label.toLowerCase()}`} onClick={() => navigator.clipboard?.writeText(value).then(() => { setOk(true); setTimeout(() => setOk(false), 1500); })}>{ok ? <>{Icon.check(12)} Copied</> : "Copy"}</button></div>;
+}
+export function SandboxBuyer({ compact }: { compact?: boolean }) {
+  return (
+    <div className="sbx" role="note" aria-label="Sandbox test buyer">
+      <p className="sbx-t">{Icon.lock(13)} {compact ? "Log in to PayPal with the test buyer" : "Sandbox: log in to PayPal with this test buyer"}</p>
+      <CopyField label="Email" value={SANDBOX_BUYER.email} />
+      <CopyField label="Password" value={SANDBOX_BUYER.password} />
+      {!compact && <p className="sbx-note">Sandbox money only. No real account or card is charged.</p>}
+    </div>
+  );
+}

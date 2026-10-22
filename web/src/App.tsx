@@ -3,6 +3,7 @@ import { api, USER_ID, type Mandate, type Wallet } from "./api";
 import { Dashboard } from "./Dashboard";
 import { Setup } from "./Setup";
 import { Orders } from "./Orders";
+import { CreatedBy } from "./CreatedBy";
 import { Icon, Skeleton, Spinner, Wordmark, useDismiss } from "./ui";
 
 // AG Studio is large, so the spending report loads only when opened.
@@ -32,6 +33,7 @@ function AccountMenu({ wallet, onReset }: { wallet: Wallet | null; onReset: (mod
         </div> : <>
           <button role="menuitem" className="menu-item" onClick={() => setConfirm("fresh")}>{Icon.refresh(16)}<span><b>Start fresh</b><span>Clear mandates, orders and history. Keep PayPal linked.</span></span></button>
           <button role="menuitem" className="menu-item" onClick={() => setConfirm("new")}>{Icon.logout(16)}<span><b>New tester</b><span>Clear everything and unlink PayPal for the next person.</span></span></button>
+          <div className="menu-sep" /><CreatedBy menuItem />
         </>}
       </div>}
     </div>
@@ -51,6 +53,7 @@ export function App() {
   const load = useCallback(() => Promise.all([api<Wallet[]>("/api/wallets"), api<Mandate[]>(`/api/mandates?userId=${USER_ID}`)])
     .then(([w, m]) => { setWallet(w[0] ?? null); setMandates(m); }).catch(() => {}).finally(() => setBoot(false)), []);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { const f = () => setCreating(true); addEventListener("mandate:new", f); return () => removeEventListener("mandate:new", f); }, []);
   const current = mandates.find((m) => m.id === currentId) ?? mandates.find((m) => m.status === "active") ?? mandates[0] ?? null;
   const select = (id: string) => { setCurrentId(id); localStorage.setItem(CURRENT, id); setCreating(false); };
   async function reset(mode: "fresh" | "new") {
@@ -59,7 +62,7 @@ export function App() {
     if (mode === "new") setWallet(null);
     location.hash = "#/"; await load();
   }
-  const page = route === "spending" ? <Suspense fallback={<main className="setup"><section className="card"><Skeleton lines={5} /></section></main>}><ConsolePage licenseKey={license} mandates={mandates} /></Suspense>
+  const page = route === "spending" ? <Suspense fallback={<main className="setup"><section className="card"><Skeleton lines={5} /></section></main>}><ConsolePage licenseKey={license} mandates={mandates} onChanged={load} /></Suspense>
     : route === "orders" ? <Orders mandates={mandates} />
     : boot ? <main className="setup"><section className="card"><Skeleton lines={5} /></section></main>
     : current && !creating ? <Dashboard key={current.id} mandateId={current.id} mandates={mandates} onSelect={select} onNew={() => setCreating(true)} onChanged={load} onReset={() => { load(); }} />
@@ -80,7 +83,7 @@ export function App() {
         </div>
       </header>
       {page}
-      <footer className="foot"><span>Mandate · PayPal sandbox demo</span>{harness && <a href="/harness.html">Developer harness</a>}</footer>
+      <footer className="foot"><span>Mandate · PayPal sandbox demo{harness && <> · <a href="/harness.html">Developer harness</a></>}</span><CreatedBy /></footer>
     </div>
   );
 }

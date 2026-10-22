@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, amt, CATEGORIES, dateOf, per, USER_ID, type Category, type Mandate, type MandateInput, type Wallet } from "./api";
-import { Icon, MicButton, PayPalButton, Spinner } from "./ui";
+import { Icon, MicButton, PayPalButton, Spinner, SandboxBuyer } from "./ui";
 import { useSpeech } from "./speech";
 
 /*
@@ -214,7 +214,7 @@ export function Setup({ wallet, onWallet, onSigned, onCancel }: { wallet: Wallet
               <p className="sm muted">Your agent pays through PayPal, so your card details never touch it. PayPal shows a $1.00 check that's voided right away. Unlink anytime.</p>
             </div>
             {busy === "sign" ? <div className="row center"><Spinner /> Activating…</div> : <PayPalButton kind="vault" onDone={(w: any) => { const wl = { walletRef: w.walletRef, label: w.label, createdAt: new Date().toISOString() }; onWallet(wl); activate(wl.walletRef); }} onError={setErr} />}
-            <p className="fine center">Sandbox: sign in with the test buyer from the README. No real money moves.</p>
+            <SandboxBuyer />
           </>}
           <ul className="assure xs muted"><li>{Icon.lock(13)} Rules are locked with your signature, so no agent can change them.</li><li>{Icon.hand(13)} Revoke stops all spending instantly.</li></ul>
         </section>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AgStudio, AgStudioProvider } from "ag-studio-react";
 import { AgStudioAiModule, type AgStudioMode } from "ag-studio";
 import { buildStudioData, type ConsoleData } from "./data";
@@ -7,8 +7,9 @@ import { consoleWidgets } from "./widgets";
 import { mandateTheme } from "./theme";
 import { buildAi } from "./ai";
 import { aiToolDisplay } from "./toolDisplay";
-import { Icon } from "../ui";
-import type { Mandate } from "../api";
+import { Icon, Spinner } from "../ui";
+import { api, mandateTitle, type Mandate } from "../api";
+import { AttemptModal, type AttemptLite } from "../Receipt";
 import "./console.css";
 
 type Period = "month" | "30" | "90" | "all";
@@ -22,7 +23,9 @@ function since(p: Period, now = new Date()) {
   return new Date(now.getTime() - Number(p) * 86400e3);
 }
 
-export default function ConsolePage({ licenseKey, mandates: _m }: { licenseKey?: string; mandates?: Mandate[] }) {
+type Removal = { name: string; kind: "sample" | "builtin" | "key"; mandates: { id: string; title: string; keyId?: string }[] };
+
+export default function ConsolePage({ licenseKey, mandates = [], onChanged }: { licenseKey?: string; mandates?: Mandate[]; onChanged?: () => void }) {
   const [data, setData] = useState<ConsoleData | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [mode, setMode] = useState<AgStudioMode>("view");
@@ -34,20 +37,50 @@ export default function ConsolePage({ licenseKey, mandates: _m }: { licenseKey?:
   const [phone, setPhone] = useState(() => matchMedia(phoneQuery).matches);
   useEffect(() => { const mq = matchMedia(phoneQuery); const f = () => setPhone(mq.matches); mq.addEventListener("change", f); return () => mq.removeEventListener("change", f); }, []);
   useEffect(() => { if (phone && mode === "edit") setMode("view"); }, [phone]);
-  useEffect(() => {
-    fetch("/api/console/data").then((r) => r.json()).then((d: ConsoleData) => {
+  const loadData = () => fetch("/api/console/data").then((r) => r.json()).then((d: ConsoleData) => {
       setData(d);
       const mine = d.attempts.filter((a) => a.source === "Live").length;
       setSource((s) => s ?? (mine > 0 ? "mine" : "sample"));
     }).catch(() => setErr("Couldn't load spending data."));
-  }, []);
+  useEffect(() => { loadData(); }, []);
+  // Purchase history rows open a receipt; agent cards ask to remove an agent (both dispatched from AG Studio widgets).
+  const [attempt, setAttempt] = useState<AttemptLite | null>(null);
+  const [removal, setRemoval] = useState<Removal | null>(null); const [rmBusy, setRmBusy] = useState(false); const [toast, setToast] = useState<string | null>(null);
+  const [hidden, setHidden] = useState<Set<string>>(() => new Set(JSON.parse(sessionStorage.getItem("mandate.hiddenSampleAgents") ?? "[]")));
+  useEffect(() => { sessionStorage.setItem("mandate.hiddenSampleAgents", JSON.stringify([...hidden])); }, [hidden]);
+  useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 4200); return () => clearTimeout(t); }, [toast]);
 
   const src = source ?? "sample";
   const pool = useMemo(() => {
     if (!data) return null;
     const live = src === "mine" ? "Live" : "Simulated";
-    return { mandates: data.mandates.filter((m) => m.source === live), attempts: data.attempts.filter((a) => a.source === live) };
-  }, [data, src]);
+    return { mandates: data.mandates.filter((m) => m.source === live), attempts: data.attempts.filter((a) => a.source === live && !(live === "Simulated" && hidden.has(a.agent))) };
+  }, [data, src, hidden]);
+  const srcRef = useMemo(() => ({ src, pool, mandates }), [src, pool, mandates]);
+  const ctx = useRef(srcRef); ctx.current = srcRef;
+  useEffect(() => {
+    const onAttempt = (e: Event) => setAttempt((e as CustomEvent).detail as AttemptLite);
+    const onRemove = async (e: Event) => {
+      const name = String((e as CustomEvent).detail?.name ?? ""); const { src, pool, mandates } = ctx.current;
+      if (src === "sample") { const ids = [...new Set(pool?.attempts.filter((a) => a.agent === name).map((a) => a.mandateId))]; setRemoval({ name, kind: "sample", mandates: ids.map((id) => ({ id, title: pool?.mandates.find((m) => m.id === id)?.title ?? "" })) }); return; }
+      const active = mandates.filter((m) => m.status === "active");
+      if (name === "Shopping agent") { setRemoval({ name, kind: "builtin", mandates: active.map((m) => ({ id: m.id, title: mandateTitle(m) })) }); return; }
+      const keys = (await Promise.all(active.map((m) => api<{ id: string; agentName: string; revoked?: boolean }[]>(`/api/mandates/${m.id}/agent-keys`).then((ks) => ks.filter((k) => !k.revoked && k.agentName === name).map((k) => ({ id: m.id, title: mandateTitle(m), keyId: k.id }))).catch(() => [])))).flat();
+      setRemoval({ name, kind: "key", mandates: keys });
+    };
+    addEventListener("mandate:attempt", onAttempt); addEventListener("mandate:remove-agent", onRemove);
+    return () => { removeEventListener("mandate:attempt", onAttempt); removeEventListener("mandate:remove-agent", onRemove); };
+  }, []);
+  async function confirmRemove(redo = false) {
+    if (!removal) return; setRmBusy(true);
+    try {
+      if (removal.kind === "sample") { setHidden((h) => new Set([...h, removal.name])); setToast(`${removal.name} removed from the sample household.`); }
+      else if (removal.kind === "key") { for (const m of removal.mandates) await api(`/api/agent-keys/${m.keyId}/revoke`, {}); setToast(`${removal.name} can no longer spend. Its past purchases stay in your history.`); }
+      else { for (const m of removal.mandates) await api(`/api/mandates/${m.id}/revoke`, {}); setToast("Mandate deleted. All spending under it has stopped."); }
+      setRemoval(null); await loadData(); onChanged?.();
+      if (redo) { location.hash = "#/"; dispatchEvent(new CustomEvent("mandate:new")); }
+    } finally { setRmBusy(false); }
+  }
   const view = useMemo(() => {
     if (!pool || !data) return null;
     const from = since(period);
@@ -120,6 +153,24 @@ export default function ConsolePage({ licenseKey, mandates: _m }: { licenseKey?:
                 onStateUpdated={(e: any) => { const id = e.state?.selectedPageId; if (id && id !== page && pageTitles[id]) setPage(id); }} />
             </AgStudioProvider>
           </div>}
+      {src === "sample" && hidden.size > 0 && page === "agents" && <p className="xs muted center restore">{hidden.size} sample agent{hidden.size === 1 ? "" : "s"} removed. <button className="link" onClick={() => setHidden(new Set())}>Bring them back</button></p>}
+      {attempt && <AttemptModal a={attempt} onClose={() => setAttempt(null)} onChanged={() => { loadData(); onChanged?.(); }} />}
+      {removal && <div className="modal-bg" onMouseDown={(e) => e.target === e.currentTarget && setRemoval(null)}>
+        <div className="modal confirm card" role="alertdialog" aria-modal="true" aria-labelledby="rm-t">
+          <h2 id="rm-t">Remove {removal.name}?</h2>
+          {removal.kind === "sample" ? <p className="sm muted">This hides {removal.name} and its purchases from the sample household. Sample data only, so nothing else changes.</p>
+            : removal.kind === "key" ? (removal.mandates.length ? <p className="sm muted">{removal.name} loses its key for <b>{removal.mandates.map((m) => m.title).join(", ")}</b> and can't spend again. Its past purchases and receipts stay in your history.</p>
+                : <p className="sm muted">{removal.name} is already disconnected. Its past purchases stay in your history.</p>)
+            : removal.mandates.length ? <p className="sm muted">The built-in Shopping agent belongs to its mandate, so removing it deletes <b>{removal.mandates.map((m) => m.title).join(", ")}</b> and stops every agent under it. Orders and receipts stay in your history. Set a mistake right by creating a new budget.</p>
+              : <p className="sm muted">There's no active mandate for the Shopping agent, so it can't spend.</p>}
+          <div className="row end wrap">
+            <button className="btn ghost sm" onClick={() => setRemoval(null)}>Cancel</button>
+            {removal.kind === "builtin" && removal.mandates.length > 0 && <button className="btn sm" disabled={rmBusy} onClick={() => confirmRemove(true)}>Delete and set a new budget</button>}
+            {(removal.kind === "sample" || removal.mandates.length > 0) && <button className="btn danger sm" disabled={rmBusy} onClick={() => confirmRemove()}>{rmBusy ? <Spinner /> : null} {removal.kind === "builtin" ? "Delete mandate" : "Remove agent"}</button>}
+          </div>
+        </div>
+      </div>}
+      {toast && <p className="toast" role="status">{toast}</p>}
     </main>
   );
 }

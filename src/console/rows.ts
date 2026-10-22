@@ -62,7 +62,9 @@ export function liveRows(svc: MandateService): { attempts: AttemptRow[]; mandate
 /** Deterministic PRNG so the simulated history is identical on every load. */
 function rng(seed: number) { return () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32); }
 
-type SimProduct = [name: string, price: string, category: Category, merchant: string];
+type SimProduct = [name: string, price: string, category: Category, merchant: string, weight?: number];
+/** Weighted pick: everyday items dominate; out-of-rules temptations are rare, as in a real household. */
+function pickProduct(ps: SimProduct[], x: number) { const t = ps.reduce((a, p) => a + (p[4] ?? 1), 0); let acc = 0; for (const p of ps) { acc += (p[4] ?? 1) / t; if (x < acc) return p; } return ps[ps.length - 1]; }
 type Sim = IntentMandate & { agentsList: string[]; products: SimProduct[]; rate: number };
 const SIM_SHIP: ShipTo = { name: "Jordan Lee", line1: "742 Maple Ave", city: "Portland", region: "OR", postalCode: "97205", country: "US" };
 const WHY = ["Running low, so it reordered the usual.", "Cheapest in-stock option across the shops it checked.", "Regular reorder: the last one was about three weeks ago.", "You asked for this in chat.", "On sale today, under your usual price."];
@@ -71,18 +73,26 @@ const WHY = ["Running low, so it reordered the usual.", "Cheapest in-stock optio
 function sims(created: string): Sim[] {
   const base = { userId: "sim", walletRef: "sim", currency: "USD", expiresAt: "2027-12-31T00:00:00Z", createdAt: created, status: "active", signature: "sim" } as const;
   return [
-    { ...base, id: "sim_coffee", summary: "Coffee and kitchen supplies up to $120 a month, ask me above $25", budget: { amount: "120.00", period: "month" }, approvalAbove: "25.00", categories: ["coffee", "kitchen"], rate: 0.3,
-      agentsList: ["Shopping agent", "Claude Code"], products: [["Single-origin coffee beans, 1 lb", "18.00", "coffee", "Ridgeline Roasters"], ["Paper filters, 100 pack", "6.50", "coffee", "Ridgeline Roasters"], ["Oat milk, 6 pack", "21.00", "kitchen", "Corner Supply Co."], ["Burr grinder", "79.00", "coffee", "Ridgeline Roasters"], ["Gooseneck kettle", "34.00", "kitchen", "Corner Supply Co."], ["Wireless headphones", "149.00", "electronics", "Volt Outlet"]] },
-    { ...base, id: "sim_household", summary: "Household basics up to $80 a month from Corner Supply Co., ask me above $20", budget: { amount: "80.00", period: "month" }, approvalAbove: "20.00", categories: ["household"], merchants: ["Corner Supply Co."], rate: 0.28,
-      agentsList: ["Household bot", "Pantry planner"], products: [["Dish soap refill, 1 L", "9.00", "household", "Corner Supply Co."], ["Paper towels, 6 rolls", "14.00", "household", "Corner Supply Co."], ["Laundry pods, 42 ct", "19.00", "household", "Corner Supply Co."], ["Trash bags, 50 ct", "12.00", "household", "Corner Supply Co."], ["Cordless vacuum", "189.00", "household", "Corner Supply Co."], ["Paper towels, 12 rolls", "22.00", "household", "QuickMart"]] },
-    { ...base, id: "sim_books", summary: "Books and audiobooks up to $40 a month, ask me above $25", budget: { amount: "40.00", period: "month" }, approvalAbove: "25.00", categories: ["books", "digital"], rate: 0.12,
-      agentsList: ["Reading list bot"], products: [["Paperback novel", "16.00", "books", "Pageturner Books"], ["E-book: field guide", "9.99", "digital", "Pageturner Books"], ["Audiobook credit", "14.95", "digital", "Pageturner Books"], ["Art book, hardcover", "65.00", "books", "Pageturner Books"]] },
-    { ...base, id: "sim_gifts", summary: "Gifts up to $100 a month, ask me above $30", budget: { amount: "100.00", period: "month" }, approvalAbove: "30.00", categories: ["gifts"], rate: 0.08,
-      agentsList: ["Gift concierge"], products: [["Greeting card", "6.00", "gifts", "Bloom & Co."], ["Chocolate box", "22.00", "gifts", "Bloom & Co."], ["Candle set", "28.00", "gifts", "Bloom & Co."], ["Flower bouquet", "55.00", "gifts", "Bloom & Co."]] },
-    { ...base, id: "sim_tech", summary: "Cables and small tech up to $50 a month, ask me above $20", budget: { amount: "50.00", period: "month" }, approvalAbove: "20.00", categories: ["electronics"], rate: 0.08,
-      agentsList: ["Cursor"], products: [["USB-C cable, 2 m", "12.00", "electronics", "Volt Outlet"], ["Wireless mouse", "24.00", "electronics", "Volt Outlet"], ["65 W charger", "29.00", "electronics", "Volt Outlet"], ["27-inch monitor", "249.00", "electronics", "Volt Outlet"]] },
+    { ...base, id: "sim_coffee", summary: "Coffee and kitchen supplies up to $150 a month, ask me above $25", budget: { amount: "150.00", period: "month" }, approvalAbove: "25.00", categories: ["coffee", "kitchen"], rate: 0.36,
+      agentsList: ["Shopping agent", "Claude Code"], products: [["Single-origin coffee beans, 1 lb", "18.00", "coffee", "Ridgeline Roasters"], ["Paper filters, 100 pack", "6.50", "coffee", "Ridgeline Roasters"], ["Oat milk, 6 pack", "21.00", "kitchen", "Corner Supply Co."], ["Burr grinder", "79.00", "coffee", "Ridgeline Roasters", 0.25], ["Gooseneck kettle", "34.00", "kitchen", "Corner Supply Co.", 0.4], ["Wireless headphones", "149.00", "electronics", "Volt Outlet", 0]] },
+    { ...base, id: "sim_household", summary: "Household basics up to $150 a month from Corner Supply Co., ask me above $25", budget: { amount: "150.00", period: "month" }, approvalAbove: "25.00", categories: ["household"], merchants: ["Corner Supply Co."], rate: 0.34,
+      agentsList: ["Household bot", "Pantry planner"], products: [["Dish soap refill, 1 L", "9.00", "household", "Corner Supply Co."], ["Paper towels, 6 rolls", "14.00", "household", "Corner Supply Co."], ["Laundry pods, 42 ct", "19.00", "household", "Corner Supply Co."], ["Trash bags, 50 ct", "12.00", "household", "Corner Supply Co."], ["Cordless vacuum", "189.00", "household", "Corner Supply Co.", 0.05], ["Paper towels, 12 rolls", "22.00", "household", "QuickMart", 0]] },
+    { ...base, id: "sim_books", summary: "Books and audiobooks up to $60 a month, ask me above $25", budget: { amount: "60.00", period: "month" }, approvalAbove: "25.00", categories: ["books", "digital"], rate: 0.16,
+      agentsList: ["Reading list bot"], products: [["Paperback novel", "16.00", "books", "Pageturner Books"], ["E-book: field guide", "9.99", "digital", "Pageturner Books"], ["Audiobook credit", "14.95", "digital", "Pageturner Books"], ["Art book, hardcover", "65.00", "books", "Pageturner Books", 0.2]] },
+    { ...base, id: "sim_gifts", summary: "Gifts up to $100 a month, ask me above $30", budget: { amount: "100.00", period: "month" }, approvalAbove: "30.00", categories: ["gifts"], rate: 0.1,
+      agentsList: ["Gift concierge"], products: [["Greeting card", "6.00", "gifts", "Bloom & Co."], ["Chocolate box", "22.00", "gifts", "Bloom & Co."], ["Candle set", "28.00", "gifts", "Bloom & Co."], ["Flower bouquet", "55.00", "gifts", "Bloom & Co.", 0.5]] },
+    { ...base, id: "sim_tech", summary: "Cables and small tech up to $80 a month, ask me above $20", budget: { amount: "80.00", period: "month" }, approvalAbove: "20.00", categories: ["electronics"], rate: 0.1,
+      agentsList: ["Cursor"], products: [["USB-C cable, 2 m", "12.00", "electronics", "Volt Outlet"], ["Wireless mouse", "24.00", "electronics", "Volt Outlet"], ["65 W charger", "29.00", "electronics", "Volt Outlet"], ["27-inch monitor", "249.00", "electronics", "Volt Outlet", 0.08]] },
   ] as Sim[];
 }
+
+/** Out-of-rules attempts in the sample history: prompt injections, a shop and a category outside the rules. */
+const TEMPTATIONS: { d: number; mandate: string; product: SimProduct }[] = [
+  { d: 71, mandate: "sim_coffee", product: ["Wireless headphones", "49.00", "electronics", "Volt Outlet"] },
+  { d: 47, mandate: "sim_household", product: ["Paper towels, 12 rolls", "22.00", "household", "QuickMart"] },
+  { d: 26, mandate: "sim_books", product: ["Wireless mouse", "24.00", "electronics", "Volt Outlet"] },
+  { d: 9, mandate: "sim_coffee", product: ["Wireless headphones", "49.00", "electronics", "Volt Outlet"] },
+];
 
 /** A simulated order, shaped like a live Receipt so the Orders page renders it the same way. */
 export interface SimOrder extends Receipt { sample: true }
@@ -98,22 +108,26 @@ export function simulatedRows(now = new Date()): { attempts: AttemptRow[]; manda
   const spend: SpendRecord[] = []; const attempts: AttemptRow[] = []; const orders: SimOrder[] = [];
   let n = 0; let allowed = 0;
   for (let d = 84; d >= 0; d--) {
-    for (const m of all) {
-      if (r() > m.rate) continue;
+    // Everyday purchases are random; the few out-of-rules attempts are scripted so the story stays realistic.
+    const jobs: [Sim, SimProduct | null][] = [];
+    for (const m of all) if (r() <= m.rate) jobs.push([m, null]);
+    for (const t of TEMPTATIONS) if (t.d === d) jobs.push([all.find((x) => x.id === t.mandate)!, t.product]);
+    for (const [m, fixed] of jobs) {
       const at = new Date(now.getTime() - d * 86400e3 - Math.floor(r() * 10 + 1) * 3600e3).toISOString();
-      const [name, price, category, merchant] = m.products[Math.floor(r() * m.products.length)];
+      const [name, price, category, merchant] = fixed ?? pickProduct(m.products, r());
       const quantity = category === "coffee" && Number(price) < 20 && r() > 0.7 ? 2 : 1;
-      const lines: CartLine[] = [{ sku: `sim-${name}`, name, unitAmount: price, quantity, category, merchant }];
+      const image = `/sample/${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}.webp`;
+      const lines: CartLine[] = [{ sku: `sim-${name}`, name, unitAmount: price, quantity, category, merchant, image }];
       const agent = m.agentsList[Math.floor(r() * m.agentsList.length)];
       const p = evaluate(m, lines, spend, agent, new Date(at));
       let outcome: AttemptRow["outcome"]; let spent = 0;
       if (p.decision === "allow") { outcome = ++allowed % 9 === 4 ? "Refunded" : "Allowed"; } // about 1 in 9 undone, so refunds always show
-      else if (p.decision === "needs_approval") { outcome = r() < (p.rule === "budget" ? 0.15 : 0.6) ? "Approved by you" : "Declined by you"; }
+      else if (p.decision === "needs_approval") { outcome = r() < (p.rule === "budget" ? 0.5 : 0.85) ? "Approved by you" : "Declined by you"; }
       else outcome = "Blocked";
       if (outcome === "Allowed" || outcome === "Approved by you") { spent = p.totalCents; spend.push({ mandateId: m.id, totalCents: p.totalCents, at, status: "captured" }); }
       const id = `sim_${++n}`; const why = WHY[Math.floor(r() * WHY.length)];
       const orderId = `SAMPLE-${(1e9 + n * 7919).toString(36).toUpperCase()}`;
-      attempts.push({ id, at, day: at.slice(0, 10), source: "Simulated", mandateId: m.id, mandate: mandateTitle(m), shipTo: "Portland, OR", agent, merchant, item: `${quantity > 1 ? `${quantity} × ` : ""}${name}`, category,
+      attempts.push({ id, at, day: at.slice(0, 10), source: "Simulated", mandateId: m.id, mandate: mandateTitle(m), image, shipTo: "Portland, OR", agent, merchant, item: `${quantity > 1 ? `${quantity} × ` : ""}${name}`, category,
         amount: usd(p.totalCents), spent: usd(spent), spentThisMonth: 0, blockedAmount: outcome === "Blocked" ? usd(p.totalCents) : 0, attempts: 1, outcome, decision: p.decision,
         rule: ruleLabel(outcome === "Approved by you" ? "approval" : p.rule), reason: p.reason, rationale: why, paypalOrderId: outcome === "Blocked" || outcome === "Declined by you" ? "" : orderId });
       if (outcome === "Allowed" || outcome === "Approved by you" || outcome === "Refunded")
