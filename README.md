@@ -12,9 +12,7 @@ Mandate turns a sentence like "keep me stocked on coffee, no more than $60 a mon
 <summary><img src="docs/andrey.png" width="22" height="22" alt="" align="absmiddle"> Created by <b>Andrey Alchin</b> · Technical Product Manager | AI &amp; 0-1 Prototyping</summary>
 <br>
 <table>
-<tr><td rowspan="4" valign="top"><img src="docs/andrey.png" width="88" height="88" alt="Andrey Alchin"></td><td><b>Andrey Alchin</b><br>Technical Product Manager | AI &amp; 0-1 Prototyping</td></tr>
-<tr><td>Email: <a href="https://www.linkedin.com/in/aalchin">linkedin.com/in/aalchin</a></td></tr>
-<tr><td>Website: <a href="https://www.linkedin.com/in/aalchin">linkedin.com/in/aalchin</a></td></tr>
+<tr><td rowspan="2" valign="top"><img src="docs/andrey.png" width="88" height="88" alt="Andrey Alchin"></td><td><b>Andrey Alchin</b><br>Technical Product Manager | AI &amp; 0-1 Prototyping</td></tr>
 <tr><td>LinkedIn: <a href="https://www.linkedin.com/in/aalchin">linkedin.com/in/aalchin</a></td></tr>
 </table>
 </details>
