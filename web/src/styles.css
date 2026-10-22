@@ -561,7 +561,7 @@ select { border: 1px solid var(--line-strong); border-radius: 8px; height: 34px;
 .by-links { list-style: none; margin: 12px 0 0; padding: 12px 0 0; border-top: 1px solid var(--line); width: 100%; display: grid; gap: 8px; text-align: left; }
 .by-links li { display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 10px; font-size: 13px; align-items: baseline; }
 .by-links span { color: var(--muted); font-size: 12px; } .by-links a { color: var(--accent); overflow-wrap: anywhere; text-decoration: none; } .by-links a:hover { text-decoration: underline; }
-.by-made { margin-top: 10px; font-size: 11.5px; color: var(--faint, var(--muted)); }
+.by-made { margin-top: 10px; text-wrap: balance; font-size: 11.5px; color: var(--faint, var(--muted)); }
 .by-x { position: absolute; top: 10px; right: 10px; }
 
 /* ---------- One-page printed receipt ---------- */

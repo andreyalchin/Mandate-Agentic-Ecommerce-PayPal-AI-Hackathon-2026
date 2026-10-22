@@ -24,7 +24,7 @@ export function CreatedBy({ menuItem, onOpen }: { menuItem?: boolean; onOpen?: (
             <li><span>LinkedIn</span><a href="https://www.linkedin.com/in/aalchin" target="_blank" rel="noopener">linkedin.com/in/aalchin ↗</a></li>
             <li><span>GitHub</span><a href="https://github.com/andreyalchin" target="_blank" rel="noopener">github.com/andreyalchin ↗</a></li>
           </ul>
-          <p className="by-made">Built for the PayPal AI Hackathon 2026 · Made with Perplexity Computer</p>
+          <p className="by-made">PayPal AI Hackathon 2026 · Made with Perplexity Computer</p>
         </div>
       </div>, document.body)}
   </>;
