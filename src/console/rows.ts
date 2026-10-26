@@ -17,8 +17,10 @@ const PER: Record<string, string> = { month: "/mo", week: "/wk", once: " total" 
 const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
 /** "Coffee & kitchen · $60/mo": short enough for a dropdown or a chart label. */
 export function mandateTitle(m: Pick<IntentMandate, "categories" | "budget">) {
-  const cats = m.categories.slice(0, 2).map(cap).join(" & ").replace(/ & (\w)/, (_x, c) => ` & ${c.toLowerCase()}`) + (m.categories.length > 2 ? " +" : "");
-  return `${cats} · $${Number(m.budget.amount).toFixed(0)}${PER[m.budget.period] ?? ""}`;
+  const cats = m.categories.map(cap);
+  const name = cats.length <= 2 ? cats.join(" & ") : cats.length === 3 ? `${cats[0]}, ${cats[1]} & ${cats[2]}` : `${cats[0]}, ${cats[1]} & ${cats.length - 2} more`;
+  const words = name.replace(/ (\w)/g, (_x, c: string) => ` ${c.toLowerCase()}`);
+  return `${words} · $${Number(m.budget.amount).toFixed(0)}${PER[m.budget.period] ?? ""}`;
 }
 
 const RULE_LABEL: Record<string, string> = {

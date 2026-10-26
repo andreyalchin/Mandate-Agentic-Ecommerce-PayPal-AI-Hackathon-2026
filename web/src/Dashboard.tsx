@@ -32,7 +32,7 @@ function MandateSwitcher({ mandates, current, onSelect, onNew }: { mandates: Man
     <div className="switcher" ref={ref}>
       <button className="switch-btn" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen(!open)}>
         <span className={`switch-icon ${cur.status}`}>{cur.status === "active" ? Icon.shield(16) : Icon.archive(16)}</span>
-        <span className="switch-text"><b>{mandateTitle(cur)}</b><span>{cur.status === "active" ? "Active" : "Archived"} · {mandates.length} mandate{mandates.length === 1 ? "" : "s"}</span></span>
+        <span className="switch-text"><b><Title t={mandateTitle(cur)} /></b><span>{cur.status === "active" ? "Active" : "Archived"} · {mandates.length} mandate{mandates.length === 1 ? "" : "s"}</span></span>
         <span className="chev">{Icon.chevron(16)}</span>
       </button>
       {open && <div className="menu switch-menu">
@@ -43,7 +43,7 @@ function MandateSwitcher({ mandates, current, onSelect, onNew }: { mandates: Man
         <ul className="switch-list" role="listbox" aria-label={tab === "active" ? "Active mandates" : "Archived mandates"}>
           {list.length === 0 && <li className="xs muted switch-empty">{tab === "active" ? "No active mandates. Create one below." : "Revoked mandates appear here, with their orders kept."}</li>}
           {list.map((m) => <li key={m.id}><button role="option" aria-selected={m.id === current} className={m.id === current ? "on" : ""} onClick={() => { onSelect(m.id); setOpen(false); }}>
-            <span className="sl-top"><b>{mandateTitle(m)}</b>{m.id === current && Icon.check(14)}</span>
+            <span className="sl-top"><b><Title t={mandateTitle(m)} /></b>{m.id === current && Icon.check(14)}</span>
             <span className="sl-sub">{m.summary}</span>
             <span className="sl-meta">Signed {shortDate(m.createdAt)} · {m.status === "active" ? `expires ${shortDate(m.expiresAt)}` : "revoked"}</span>
           </button></li>)}
@@ -257,6 +257,9 @@ function Activity({ rows, loading }: { rows: Row[]; loading: boolean }) {
 }
 
 /* ---------- Page ---------- */
+
+/** Keeps the price ("· $60/mo") on one line with its name when a long title wraps. */
+const Title = ({ t }: { t: string }) => { const k = t.lastIndexOf(" · "); return k < 0 ? <>{t}</> : <>{t.slice(0, k)} <span className="nw">· {t.slice(k + 3)}</span></>; };
 
 export function Dashboard({ mandateId, mandates, onSelect, onNew, onChanged, onReset }: { mandateId: string; mandates: Mandate[]; onSelect: (id: string) => void; onNew: () => void; onChanged: () => void; onReset: () => void }) {
   const [st, setSt] = useState<MandateState | null>(null);

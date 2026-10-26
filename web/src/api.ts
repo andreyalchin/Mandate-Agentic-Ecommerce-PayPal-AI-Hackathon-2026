@@ -36,8 +36,10 @@ const PER: Record<string, string> = { month: "/mo", week: "/wk", once: " total" 
 const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
 /** Short mandate name, e.g. "Coffee & kitchen · $60/mo" (same rule as the server's console rows). */
 export function mandateTitle(m: Pick<Mandate, "categories" | "budget">) {
-  const c = m.categories.slice(0, 2); const cats = c.map((x, i) => (i ? x : cap(x))).join(" & ") + (m.categories.length > 2 ? " +" : "");
-  return `${cats} · $${Number(m.budget.amount).toFixed(0)}${PER[m.budget.period] ?? ""}`;
+  const cats = m.categories.map(cap);
+  const name = cats.length <= 2 ? cats.join(" & ") : cats.length === 3 ? `${cats[0]}, ${cats[1]} & ${cats[2]}` : `${cats[0]}, ${cats[1]} & ${cats.length - 2} more`;
+  const words = name.replace(/ (\w)/g, (_x, c: string) => ` ${c.toLowerCase()}`);
+  return `${words} · $${Number(m.budget.amount).toFixed(0)}${PER[m.budget.period] ?? ""}`;
 }
 export const shipLine = (s?: ShipTo) => (s ? [s.line1, [s.city, s.region].filter(Boolean).join(", "), s.postalCode].filter(Boolean).join(", ") : "");
 export const shortDate = (iso: string) => new Date(iso).toLocaleDateString([], { month: "short", day: "numeric" });
