@@ -76,8 +76,8 @@ function MandateCard({ st, onRevoke }: { st: MandateState; onRevoke: () => void 
       <dl className="facts">
         <div><dt>Ask me above</dt><dd className="num">{amt(m.approvalAbove)}</dd></div>
         <div><dt>Expires</dt><dd>{dateOf(m.expiresAt).replace(/, \d{4}$/, "")}</dd></div>
-        <div><dt>Categories</dt><dd className="cap">{m.categories.join(", ")}</dd></div>
-        <div><dt>Shops</dt><dd>{m.merchants?.length ? m.merchants.join(", ") : "Any"}</dd></div>
+        <div className={m.categories.length > 2 ? "wide" : undefined}><dt>Categories</dt><dd className="cap wrap">{m.categories.join(", ")}</dd></div>
+        <div className={(m.merchants?.length ?? 0) > 2 ? "wide" : undefined}><dt>Shops</dt><dd className="wrap">{m.merchants?.length ? m.merchants.join(", ") : "Any"}</dd></div>
       </dl>
       <footer className="mandate-foot">
         <LockBadge valid={st.signatureValid} fingerprint={st.fingerprint} />
